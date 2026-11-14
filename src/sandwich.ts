@@ -25,7 +25,7 @@ export function generate(): Grid {
   return fill(gridFromValues(new Array(81).fill(0)))!;
 }
 /** Keep each removal only when exact search proves the remaining puzzle unique. */
-export function generatePuzzle(): {grid: Grid; clues: Clues} {
+function digPuzzle(): {grid: Grid; clues: Clues} {
   const solution = generate();
   const clues = cluesFor(solution.values);
   const values = Array.from(solution.values);
@@ -40,6 +40,30 @@ export function generatePuzzle(): {grid: Grid; clues: Clues} {
     }
   }
   return {grid: gridFromValues(values), clues};
+}
+
+export function rateLogicalPuzzle(input: Grid, clues: Clues) {
+  const grid = cloneGrid(input);
+  const techniques = new Map<string, number>();
+  let score = 0;
+  while (!isSolved(grid)) {
+    const move = nextMove(grid, clues);
+    if (!move) return null;
+    applyMove(grid, move);
+    techniques.set(move.name, (techniques.get(move.name) ?? 0) + 1);
+    score += move.score;
+  }
+  validate(grid, clues);
+  return {score, techniques: [...techniques]};
+}
+
+export function generatePuzzle(logicalOnly = false) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const puzzle = digPuzzle();
+    const rating = rateLogicalPuzzle(puzzle.grid, puzzle.clues);
+    if (!logicalOnly || rating) return {...puzzle, rating};
+  }
+  throw new Error('No puzzle with a complete logical solve was found. Try generating again.');
 }
 
 /** All compatible permutations of a line; union their candidates for sound eliminations. */

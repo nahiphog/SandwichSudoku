@@ -9,17 +9,17 @@ let worker:Worker|null=null;
 const undo:{grid:Grid;clues:Clues;score:number;history:Move[]}[]=[];
 const app=document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML=`<header><a class="brand" href="./"><span class="brand-icon">S</span> sandwich<span class="brand-tag">SUDOKU STUDIO</span></a><span class="header-note">A little constraint. A lot of possibility.</span></header>
-<main><section class="intro"><div><div class="eyebrow">THE SPACE BETWEEN 1 & 9</div><h1>Good things in between.</h1><p>Create a grid. Follow the sums. Find your next breakthrough.</p></div><div class="generation-actions"><button id="generate">Generate</button><button id="generate-puzzle" class="primary">Generate puzzle</button></div></section>
+<main><section class="intro"><div><div class="eyebrow">THE SPACE BETWEEN 1 & 9</div><h1>Good things in between.</h1><p>Create a grid. Follow the sums. Find your next breakthrough.</p></div><div class="generation-actions"><label><input id="logical-only" type="checkbox" checked> Logical techniques only</label><button id="generate">Generate</button><button id="generate-puzzle" class="primary">Generate puzzle</button></div></section>
 <div class="workspace"><section class="board-panel"><div class="panel-top"><div><span class="dot"></span><strong id="board-title">Your grid</strong></div><span id="filled"></span></div><div class="board-wrap"><div id="board" role="group" aria-label="Editable sandwich sudoku grid"></div></div><div class="board-tools"><button id="notes" aria-pressed="false">Candidates</button><button id="ring" aria-pressed="false">◈ &nbsp; Phistomefel Ring</button><button id="undo">↶ Undo</button></div><div class="keypad">${Array.from({length:9},(_,i)=>`<button data-digit="${i+1}" aria-label="Enter ${i+1}">${i+1}</button>`).join('')}<button data-digit="0" aria-label="Erase selected cell">⌫</button></div><p class="board-caption">Select a cell to edit · 1–9 to enter · Delete to erase · Arrow keys to move</p></section>
 <aside><section class="card rules"><div class="eyebrow">A CLASSIC, WITH A TWIST</div><h2>Meet sandwich sudoku.</h2><p>Normal sudoku rules apply. Clues outside the grid give the sum of digits <strong>between 1 and 9</strong> in that row or column, not including the 1 and 9 themselves.</p><div class="example"><span>1</span><b>3</b><b>5</b><b>2</b><span>9</span><em> = 10</em></div><small>Only the filling counts. Adjacent 1 and 9 give 0.</small></section>
-<section class="card"><div class="card-heading"><h2>Solving desk</h2><span class="badge"><b id="score">0</b> points</span></div><p id="status" role="status" aria-live="polite">A complete grid, fresh from the maker. Erase digits to shape your puzzle, or start blank.</p><div class="actions"><button id="hint" class="primary">Find next step →</button><button id="solve">Solve & check uniqueness</button><button id="cancel" hidden>Cancel calculation</button></div><div id="hint-detail"></div><div class="minor-actions"><button id="blank">Blank grid</button><button id="clear">Clear digits, keep clues</button></div></section>
+<section class="card"><div class="card-heading"><h2>Solving desk</h2><span class="badge"><b id="score">0</b> points</span></div><p id="status" role="status" aria-live="polite">A complete grid, fresh from the maker. Erase digits to shape your puzzle, or start blank.</p><div class="actions"><button id="hint" class="primary">Find next step →</button><button id="solve">Solve & check uniqueness</button><button id="cancel" hidden>Cancel calculation</button></div><div id="generation-rating" hidden></div><div id="hint-detail"></div><div class="minor-actions"><button id="blank">Blank grid</button><button id="clear">Clear digits, keep clues</button></div></section>
 <section class="card ring-card"><div class="card-heading"><h2>Phistomefel Ring</h2><span class="badge">+200 / use</span></div><p>The <span class="teal-text">16 ring cells</span> and <span class="orange-text">16 corner cells</span> contain identical digit counts.</p><div id="tally"></div><small>The solver compares both sets to force digits or remove candidates. Viewing the ring adds no points.</small></section></aside></div>
 <section class="lower"><details class="card"><summary>Solving history <span id="step-count">0 steps</span></summary><ol id="history"></ol></details><details class="card"><summary>Technique library <span>${Object.keys(TECHS).length} imported + 2 variant techniques</span></summary><p>Imported from <a href="https://github.com/AImenes/sudokUI" target="_blank" rel="noreferrer">sudokUI</a>. Original ratings are preserved. Classic uniqueness deductions are disabled for sandwich puzzles; the extra clues can break their assumptions. Upstream roadmap entries remain labelled.</p><div class="tech-list"><div><strong>Phistomefel Ring</strong><span>200 · Active</span></div><div><strong>Sandwich sum</strong><span>0 · Active</span></div>${Object.entries(TECHS).map(([,t])=>`<div><strong>${t.name}</strong><span>${t.score} · ${!t.implemented?'Upstream roadmap':t.category==='Uniqueness'?'Classic only':!t.enabled?'Imported · redundant':t.name==='Brute Force'?'Exact search':'Active'}</span></div>`).join('')}</div></details><details class="card"><summary>Import / export <span>Save your construction</span></summary><p>JSON stores all 81 digits and 18 clues (rows, then columns). Use null for an absent clue.</p><textarea id="data" aria-label="Puzzle JSON" placeholder="Paste exported puzzle JSON"></textarea><div class="minor-actions"><button id="export">Export</button><button id="import">Import</button></div></details></section>
 </main><footer>Made for curious minds. <span>TypeScript · sudokUI engine · GPL-3.0</span></footer>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 function status(s:string){el('status').textContent=s}
 function stop(){worker?.terminate();worker=null;el<HTMLButtonElement>('generate-puzzle').disabled=false;el('cancel').hidden=true;el<HTMLButtonElement>('hint').disabled=false;el<HTMLButtonElement>('solve').disabled=false;}
-function save(){stop();undo.push({grid:cloneGrid(grid),clues:[...clues],score,history:[...history]});pending=null;}
+function save(){stop();el("generation-rating").hidden=true;undo.push({grid:cloneGrid(grid),clues:[...clues],score,history:[...history]});pending=null;}
 function resetRating(){score=0;history=[];pending=null}
 function edit(cell:number,digit:number){save();const values=Array.from(grid.values);values[cell]=digit;grid=gridFromValues(values);resetRating();render();status('Grid updated. Find a logical step or check its solutions.');}
 function render(){
@@ -65,17 +65,33 @@ el('generate-puzzle').onclick = () => {
     ({grid, clues} = data.result);
     resetRating();
     render();
+    const report = el('generation-rating');
+    const rating = data.result.rating;
+    report.hidden = false;
+    report.replaceChildren();
+    const title = document.createElement('h3');
+    title.textContent = rating ? `Total difficulty score: ${rating.score}` : 'Logical solve stalled';
+    report.append(title);
+    if (rating) {
+      const list = document.createElement('ul');
+      for (const [name, count] of rating.techniques) {
+        const item = document.createElement('li');
+        item.textContent = `${name} × ${count}`;
+        list.append(item);
+      }
+      report.append(list);
+    }
     status('Generated a puzzle with exactly one solution and all 18 sandwich clues.');
   };
   worker.onerror = () => {
     stop();
     status('Puzzle generation failed. Please try again.');
   };
-  worker.postMessage({action: 'generate-puzzle'});
+  worker.postMessage({action: 'generate-puzzle', logicalOnly: el<HTMLInputElement>('logical-only').checked});
 };
 el('blank').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));clues=new Array(18).fill(null);resetRating();render();status('Enter givens and outside clues to build a sandwich puzzle.')};
 el('clear').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));resetRating();render();status('Digits cleared; sandwich clues retained. Clues alone may allow multiple solutions.')};
-el('undo').onclick=()=>{const old=undo.pop();if(old){stop();({grid,clues,score,history}=old);pending=null;render();status('Last change undone.')}};
+el('undo').onclick=()=>{const old=undo.pop();if(old){stop();el('generation-rating').hidden=true;({grid,clues,score,history}=old);pending=null;render();status('Last change undone.')}};
 el('notes').onclick=()=>{candidates=!candidates;render()};el('ring').onclick=()=>{ring=!ring;render()};
 el('hint').onclick=()=>run('hint');el('solve').onclick=()=>run('solve');el('cancel').onclick=()=>{stop();status('Calculation cancelled. Your grid is unchanged.')};
 document.querySelectorAll<HTMLButtonElement>('[data-digit]').forEach(b=>b.onclick=()=>edit(selected,Number(b.dataset.digit)));

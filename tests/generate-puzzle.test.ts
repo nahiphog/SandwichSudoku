@@ -11,3 +11,11 @@ it('removes digits while retaining all clues and exactly one solution', () => {
   expect(result.solutions).toHaveLength(1);
   expect(cluesFor(result.solutions[0].values)).toEqual(clues);
 });
+
+it('certifies and scores a generated puzzle without filling the returned grid', () => {
+  const {grid, rating} = generatePuzzle(true);
+  expect(grid.values).toContain(0);
+  expect(rating?.score).toBeGreaterThan(0);
+  expect(rating?.techniques.length).toBeGreaterThan(0);
+  expect(rating?.techniques.map(([name]) => name)).not.toContain('Brute Force');
+});
