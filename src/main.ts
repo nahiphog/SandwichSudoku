@@ -1,3 +1,4 @@
+import {mountPages} from './pages';
 import './style.css';
 import {gridFromValues,cloneGrid,digitsOf,isSolved,type Grid} from './vendor/engine/board';
 import {TECHS} from './vendor/engine/ratings';
@@ -55,7 +56,9 @@ el('undo').onclick=()=>{const old=undo.pop();if(old){stop();({grid,clues,score,h
 el('notes').onclick=()=>{candidates=!candidates;render()};el('ring').onclick=()=>{ring=!ring;render()};
 el('hint').onclick=()=>run('hint');el('solve').onclick=()=>run('solve');el('cancel').onclick=()=>{stop();status('Calculation cancelled. Your grid is unchanged.')};
 document.querySelectorAll<HTMLButtonElement>('[data-digit]').forEach(b=>b.onclick=()=>edit(selected,Number(b.dataset.digit)));
-window.addEventListener('keydown',e=>{if(e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement)return;if(/^[1-9]$/.test(e.key)){e.preventDefault();edit(selected,Number(e.key))}else if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();edit(selected,0)}else if(e.key.startsWith('Arrow')){e.preventDefault();const dr=e.key==='ArrowUp'?-9:e.key==='ArrowDown'?9:e.key==='ArrowLeft'?-1:1;selected=(selected+dr+81)%81;render();el('board').querySelector<HTMLButtonElement>(`[data-cell="${selected}"]`)?.focus()}});
+window.addEventListener('keydown',e=>{if(el('board').closest<HTMLElement>('.workspace')?.hidden||e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||(e.target instanceof HTMLElement && e.target.closest('.page-menu')))return;if(/^[1-9]$/.test(e.key)){e.preventDefault();edit(selected,Number(e.key))}else if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();edit(selected,0)}else if(e.key.startsWith('Arrow')){e.preventDefault();const dr=e.key==='ArrowUp'?-9:e.key==='ArrowDown'?9:e.key==='ArrowLeft'?-1:1;selected=(selected+dr+81)%81;render();el('board').querySelector<HTMLButtonElement>(`[data-cell="${selected}"]`)?.focus()}});
 el('export').onclick=()=>{el<HTMLTextAreaElement>('data').value=JSON.stringify({version:1,values:Array.from(grid.values),clues},null,2);status('Puzzle exported below. Copy the JSON to save it.')};
 el('import').onclick=()=>{try{const data=JSON.parse(el<HTMLTextAreaElement>('data').value);if(!Array.isArray(data.values)||data.values.length!==81||!data.values.every((v:unknown)=>Number.isInteger(v)&&Number(v)>=0&&Number(v)<=9)||!Array.isArray(data.clues)||data.clues.length!==18||!data.clues.every((v:unknown)=>v===null||(Number.isInteger(v)&&Number(v)>=0&&Number(v)<=35)))throw Error();save();grid=gridFromValues(data.values);clues=data.clues;resetRating();render();status('Puzzle imported. Check its validity with the solver.')}catch{status('Invalid JSON: expected 81 digits (0–9) and 18 clues (0–35 or null).')}};
 render();
+
+mountPages();
