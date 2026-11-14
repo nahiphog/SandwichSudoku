@@ -78,7 +78,7 @@ export function mountPages() {
 
   const heading = intro.querySelector('h1')!;
   const description = intro.querySelector('p')!;
-  const generate = intro.querySelector('button')!;
+  const generate = intro.querySelector<HTMLElement>('.generation-actions')!;
   const nav = menu.querySelector('nav')!;
   function route() {
     const requested = new URLSearchParams(location.search).get('page');

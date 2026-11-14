@@ -9,7 +9,7 @@ let worker:Worker|null=null;
 const undo:{grid:Grid;clues:Clues;score:number;history:Move[]}[]=[];
 const app=document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML=`<header><a class="brand" href="./"><span class="brand-icon">S</span> sandwich<span class="brand-tag">SUDOKU STUDIO</span></a><span class="header-note">A little constraint. A lot of possibility.</span></header>
-<main><section class="intro"><div><div class="eyebrow">THE SPACE BETWEEN 1 & 9</div><h1>Good things in between.</h1><p>Create a grid. Follow the sums. Find your next breakthrough.</p></div><button id="generate" class="primary">↻ &nbsp; Generate</button></section>
+<main><section class="intro"><div><div class="eyebrow">THE SPACE BETWEEN 1 & 9</div><h1>Good things in between.</h1><p>Create a grid. Follow the sums. Find your next breakthrough.</p></div><div class="generation-actions"><button id="generate">Generate</button><button id="generate-puzzle" class="primary">Generate puzzle</button></div></section>
 <div class="workspace"><section class="board-panel"><div class="panel-top"><div><span class="dot"></span><strong id="board-title">Your grid</strong></div><span id="filled"></span></div><div class="board-wrap"><div id="board" role="group" aria-label="Editable sandwich sudoku grid"></div></div><div class="board-tools"><button id="notes" aria-pressed="false">Candidates</button><button id="ring" aria-pressed="false">◈ &nbsp; Phistomefel Ring</button><button id="undo">↶ Undo</button></div><div class="keypad">${Array.from({length:9},(_,i)=>`<button data-digit="${i+1}" aria-label="Enter ${i+1}">${i+1}</button>`).join('')}<button data-digit="0" aria-label="Erase selected cell">⌫</button></div><p class="board-caption">Select a cell to edit · 1–9 to enter · Delete to erase · Arrow keys to move</p></section>
 <aside><section class="card rules"><div class="eyebrow">A CLASSIC, WITH A TWIST</div><h2>Meet sandwich sudoku.</h2><p>Normal sudoku rules apply. Clues outside the grid give the sum of digits <strong>between 1 and 9</strong> in that row or column, not including the 1 and 9 themselves.</p><div class="example"><span>1</span><b>3</b><b>5</b><b>2</b><span>9</span><em> = 10</em></div><small>Only the filling counts. Adjacent 1 and 9 give 0.</small></section>
 <section class="card"><div class="card-heading"><h2>Solving desk</h2><span class="badge"><b id="score">0</b> points</span></div><p id="status" role="status" aria-live="polite">A complete grid, fresh from the maker. Erase digits to shape your puzzle, or start blank.</p><div class="actions"><button id="hint" class="primary">Find next step →</button><button id="solve">Solve & check uniqueness</button><button id="cancel" hidden>Cancel calculation</button></div><div id="hint-detail"></div><div class="minor-actions"><button id="blank">Blank grid</button><button id="clear">Clear digits, keep clues</button></div></section>
@@ -18,7 +18,7 @@ app.innerHTML=`<header><a class="brand" href="./"><span class="brand-icon">S</sp
 </main><footer>Made for curious minds. <span>TypeScript · sudokUI engine · GPL-3.0</span></footer>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 function status(s:string){el('status').textContent=s}
-function stop(){worker?.terminate();worker=null;el('cancel').hidden=true;el<HTMLButtonElement>('hint').disabled=false;el<HTMLButtonElement>('solve').disabled=false;}
+function stop(){worker?.terminate();worker=null;el<HTMLButtonElement>('generate-puzzle').disabled=false;el('cancel').hidden=true;el<HTMLButtonElement>('hint').disabled=false;el<HTMLButtonElement>('solve').disabled=false;}
 function save(){stop();undo.push({grid:cloneGrid(grid),clues:[...clues],score,history:[...history]});pending=null;}
 function resetRating(){score=0;history=[];pending=null}
 function edit(cell:number,digit:number){save();const values=Array.from(grid.values);values[cell]=digit;grid=gridFromValues(values);resetRating();render();status('Grid updated. Find a logical step or check its solutions.');}
@@ -50,6 +50,29 @@ function run(action:'hint'|'solve'){
   worker.onerror=()=>{stop();status('Calculation failed. Your puzzle is unchanged; please try again.')};worker.postMessage({action,grid,clues});
 }
 el('generate').onclick=()=>{save();grid=generate();clues=cluesFor(grid.values);resetRating();render();status('Generated a complete valid Sudoku with 9 column clues above and 9 row clues on the left.')};
+el('generate-puzzle').onclick = () => {
+  stop();
+  el<HTMLButtonElement>('generate-puzzle').disabled = true;
+  el<HTMLButtonElement>('hint').disabled = true;
+  el<HTMLButtonElement>('solve').disabled = true;
+  el('cancel').hidden = false;
+  status('Removing digits and checking uniqueness with all 18 clues…');
+  worker = new Worker(new URL('./worker.ts', import.meta.url), {type: 'module'});
+  worker.onmessage = ({data}) => {
+    stop();
+    if (data.error) { status(data.error); return; }
+    save();
+    ({grid, clues} = data.result);
+    resetRating();
+    render();
+    status('Generated a puzzle with exactly one solution and all 18 sandwich clues.');
+  };
+  worker.onerror = () => {
+    stop();
+    status('Puzzle generation failed. Please try again.');
+  };
+  worker.postMessage({action: 'generate-puzzle'});
+};
 el('blank').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));clues=new Array(18).fill(null);resetRating();render();status('Enter givens and outside clues to build a sandwich puzzle.')};
 el('clear').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));resetRating();render();status('Digits cleared; sandwich clues retained. Clues alone may allow multiple solutions.')};
 el('undo').onclick=()=>{const old=undo.pop();if(old){stop();({grid,clues,score,history}=old);pending=null;render();status('Last change undone.')}};

@@ -24,6 +24,24 @@ export function generate(): Grid {
   }
   return fill(gridFromValues(new Array(81).fill(0)))!;
 }
+/** Keep each removal only when exact search proves the remaining puzzle unique. */
+export function generatePuzzle(): {grid: Grid; clues: Clues} {
+  const solution = generate();
+  const clues = cluesFor(solution.values);
+  const values = Array.from(solution.values);
+  let removed = 0;
+  for (const cell of shuffle(Array.from(values.keys()))) {
+    values[cell] = 0;
+    const check = solveExact(gridFromValues(values), clues, 80);
+    if (!check.exhausted && check.solutions.length === 1) {
+      if (++removed === 50) break;
+    } else {
+      values[cell] = solution.values[cell];
+    }
+  }
+  return {grid: gridFromValues(values), clues};
+}
+
 /** All compatible permutations of a line; union their candidates for sound eliminations. */
 export function lineSupport(g:Grid, cells:number[], clue:number):number[]|null {
   const support=new Array<number>(9).fill(0), line=new Array<number>(9).fill(0);
