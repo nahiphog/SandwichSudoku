@@ -117,7 +117,19 @@ el('generate-puzzle').onclick = () => {
   };
   worker.postMessage({action: 'generate-puzzle', logicalOnly: el<HTMLInputElement>('logical-only').checked, rotational: el<HTMLInputElement>('rotational').checked, digClues: el<HTMLInputElement>('dig-clues').checked});
 };
-el('cancel-generation').onclick = () => { stop(); status('Generation cancelled. Your previous grid was restored.'); };
+el('cancel-generation').onclick = () => {
+  const visiblePuzzle = preview;
+  if (!visiblePuzzle) {
+    stop();
+    status('Generation cancelled before a preview appeared.');
+    return;
+  }
+  save();
+  ({grid, clues} = visiblePuzzle);
+  resetRating();
+  render();
+  status('Generation cancelled. The grid and sums shown at cancellation were kept.');
+};
 el('blank').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));clues=new Array(18).fill(null);resetRating();render();status('Enter givens and outside clues to build a sandwich puzzle.')};
 el('clear').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));resetRating();render();status('Digits cleared; sandwich clues retained. Clues alone may allow multiple solutions.')};
 el('undo').onclick=()=>{const old=undo.pop();if(old){stop();el('walkthrough').hidden=true;el('generation-rating').hidden=true;({grid,clues,score,history}=old);pending=null;render();status('Last change undone.')}};
