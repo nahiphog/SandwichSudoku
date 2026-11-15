@@ -25,21 +25,23 @@ export function generate(): Grid {
   return fill(gridFromValues(new Array(81).fill(0)))!;
 }
 /** Keep each removal only when exact search proves the remaining puzzle unique. */
-function digPuzzle(): {grid: Grid; clues: Clues} {
+function digPuzzle(rotational: boolean) {
   const solution = generate();
   const clues = cluesFor(solution.values);
   const values = Array.from(solution.values);
-  let removed = 0;
-  for (const cell of shuffle(Array.from(values.keys()))) {
-    values[cell] = 0;
-    const check = solveExact(gridFromValues(values), clues, 80);
-    if (!check.exhausted && check.solutions.length === 1) {
-      if (++removed === 50) break;
-    } else {
-      values[cell] = solution.values[cell];
+  const groups = rotational
+    ? Array.from({length: 40}, (_, cell) => [cell, 80 - cell])
+    : Array.from(values.keys(), cell => [cell]);
+  let fullyDug = true;
+  for (const group of shuffle(groups)) {
+    for (const cell of group) values[cell] = 0;
+    const check = solveExact(gridFromValues(values), clues, 250);
+    if (check.exhausted) fullyDug = false;
+    if (check.exhausted || check.solutions.length !== 1) {
+      for (const cell of group) values[cell] = solution.values[cell];
     }
   }
-  return {grid: gridFromValues(values), clues};
+  return {grid: gridFromValues(values), clues, fullyDug};
 }
 
 export function rateLogicalPuzzle(input: Grid, clues: Clues) {
@@ -57,9 +59,9 @@ export function rateLogicalPuzzle(input: Grid, clues: Clues) {
   return {score, techniques: [...techniques]};
 }
 
-export function generatePuzzle(logicalOnly = false) {
+export function generatePuzzle(logicalOnly = false, rotational = true) {
   for (let attempt = 0; attempt < 10; attempt++) {
-    const puzzle = digPuzzle();
+    const puzzle = digPuzzle(rotational);
     const rating = rateLogicalPuzzle(puzzle.grid, puzzle.clues);
     if (!logicalOnly || rating) return {...puzzle, rating};
   }

@@ -92,15 +92,15 @@ export function mountPages() {
       else link.removeAttribute('aria-current');
     });
     intro.hidden = page === 'simulation';
-    intro.querySelector<HTMLElement>('.eyebrow')!.hidden = page !== 'generate';
-    heading.textContent = page === 'generate' ? 'Good things in between.' : label;
+    heading.textContent = label;
     description.textContent = ({
-      generate: 'Create a grid. Follow the sums. Find your next breakthrough.',
+      generate: '',
       'import-grid': 'Load a Sandwich Sudoku puzzle and check its solution.',
       techniques: 'Explore the solver’s techniques and their difficulty scores.',
       'custom-build': 'Edit digits and outside clues, then check your puzzle for uniqueness.',
       simulation: '',
     })[page];
+    description.hidden = page === 'generate';
     generate.hidden = page !== 'generate';
     workspace.hidden = !hasBoard;
     lower.hidden = page === 'simulation';
