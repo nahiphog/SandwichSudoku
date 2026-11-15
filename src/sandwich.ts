@@ -25,13 +25,15 @@ export function generate(): Grid {
   return fill(gridFromValues(new Array(81).fill(0)))!;
 }
 /** Keep each removal only when exact search proves the remaining puzzle unique. */
-function digPuzzle(rotational: boolean, digClues: boolean) {
+type DigProgress = (values: number[], clues: Clues, phase: "start" | "digits" | "clues" | "rating") => void;
+function digPuzzle(rotational: boolean, digClues: boolean, progress?: DigProgress) {
   const solution = generate();
   const clues = cluesFor(solution.values);
   const values = Array.from(solution.values);
   const groups = rotational
     ? Array.from({length: 40}, (_, cell) => [cell, 80 - cell])
     : Array.from(values.keys(), cell => [cell]);
+  progress?.(values, clues, "start");
   let fullyDug = true;
   for (const group of shuffle(groups)) {
     for (const cell of group) values[cell] = 0;
@@ -39,6 +41,8 @@ function digPuzzle(rotational: boolean, digClues: boolean) {
     if (check.exhausted) fullyDug = false;
     if (check.exhausted || check.solutions.length !== 1) {
       for (const cell of group) values[cell] = solution.values[cell];
+    } else {
+      progress?.(values, clues, "digits");
     }
   }
   const grid = gridFromValues(values);
@@ -50,7 +54,10 @@ function digPuzzle(rotational: boolean, digClues: boolean) {
       clues[index] = null;
       const check = solveExact(grid, clues, 250);
       if (check.exhausted) fullyDug = false;
-      if (!check.exhausted && check.solutions.length === 1) remaining--;
+      if (!check.exhausted && check.solutions.length === 1) {
+        remaining--;
+        progress?.(values, clues, "clues");
+      }
       else clues[index] = clue;
     }
   }
@@ -74,9 +81,10 @@ export function rateLogicalPuzzle(input: Grid, clues: Clues) {
   return {score, techniques: [...techniques], moves};
 }
 
-export function generatePuzzle(logicalOnly = false, rotational = true, digClues = false) {
+export function generatePuzzle(logicalOnly = false, rotational = true, digClues = false, progress?: DigProgress) {
   for (let attempt = 0; attempt < 10; attempt++) {
-    const puzzle = digPuzzle(rotational, digClues);
+    const puzzle = digPuzzle(rotational, digClues, progress);
+    progress?.(Array.from(puzzle.grid.values), puzzle.clues, "rating");
     const rating = rateLogicalPuzzle(puzzle.grid, puzzle.clues);
     if (!logicalOnly || rating) return {...puzzle, rating, solution: rating ? null : puzzle.solution};
   }

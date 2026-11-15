@@ -7,10 +7,12 @@ import {RING,CORNERS,applyMove,type Clues,type Move} from './sandwich';
 
 let grid=gridFromValues(new Array(81).fill(0)), clues: Clues=new Array(18).fill(null), selected=40, ring=false, candidates=false, score=0, history:Move[]=[], pending:Move|null=null;
 let worker:Worker|null=null;
+let preview: {grid: Grid; clues: Clues} | null = null;
+let progressTimer: ReturnType<typeof setTimeout> | undefined;
 const undo:{grid:Grid;clues:Clues;score:number;history:Move[]}[]=[];
 const app=document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML=`<header><a class="brand" href="./"><img src="${import.meta.env.BASE_URL}sandwich.svg" width="38" height="38" alt=""> Sandwich Sudoku</a></header>
-<main><section class="intro"><div><h1>Generate</h1><p hidden></p></div><div class="generation-actions"><label><input id="logical-only" type="checkbox" checked> Logical techniques only</label><label><input id="rotational" type="checkbox" checked> Rotational symmetry</label><label><input id="dig-clues" type="checkbox"> Dig sandwich sums</label><button id="generate-puzzle" class="primary">Generate puzzle</button></div></section>
+<main><section class="intro"><div><h1>Generate</h1><p hidden></p></div><div class="generation-actions"><label><input id="logical-only" type="checkbox" checked> Logical techniques only</label><label><input id="rotational" type="checkbox" checked> Rotational symmetry</label><label><input id="dig-clues" type="checkbox"> Dig sandwich sums</label><button id="generate-puzzle" class="primary">Generate puzzle</button><button id="cancel-generation" hidden>Cancel</button></div></section>
 <div class="workspace"><section class="board-panel"><div class="panel-top"><div><span class="dot"></span><strong id="board-title">Your grid</strong></div><span id="filled"></span></div><div class="board-wrap"><div id="board" role="group" aria-label="Editable sandwich sudoku grid"></div></div><div class="board-tools"><button id="notes" aria-pressed="false">Candidates</button><button id="ring" aria-pressed="false">◈ &nbsp; Phistomefel Ring</button><button id="undo">↶ Undo</button></div><div class="board-tools copy-tools"><button id="copy-string">Copy grid string</button><button id="copy-image">Copy grid image</button></div><div class="keypad">${Array.from({length:9},(_,i)=>`<button data-digit="${i+1}" aria-label="Enter ${i+1}">${i+1}</button>`).join('')}<button data-digit="0" aria-label="Erase selected cell">⌫</button></div><p class="board-caption">Select a cell to edit · 1–9 to enter · Delete to erase · Arrow keys to move</p></section>
 <aside><section class="card rules"><h2>Meet sandwich sudoku.</h2><p>Normal sudoku rules apply. Clues outside the grid give the sum of digits <strong>between 1 and 9</strong> in that row or column, not including the 1 and 9 themselves.</p><div class="example"><span>1</span><b>3</b><b>5</b><b>2</b><span>9</span><em> = 10</em></div><small>Only the filling counts. Adjacent 1 and 9 give 0.</small></section>
 <section class="card"><div class="card-heading"><h2>Solving desk</h2><span class="badge"><b id="score">0</b> points</span></div><p id="status" role="status" aria-live="polite">Generate a puzzle or enter your own digits and clues.</p><div class="actions"><button id="hint" class="primary">Find next step →</button><button id="solve">Solve & check uniqueness</button><button id="cancel" hidden>Cancel calculation</button></div><div id="generation-rating" hidden></div><div id="hint-detail"></div><div class="minor-actions"><button id="blank">Blank grid</button><button id="clear">Clear digits, keep clues</button></div></section>
@@ -19,25 +21,27 @@ app.innerHTML=`<header><a class="brand" href="./"><img src="${import.meta.env.BA
 </main><footer>Made for curious minds. <span>TypeScript · sudokUI engine · GPL-3.0</span></footer>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 function status(s:string){el('status').textContent=s}
-function stop(){worker?.terminate();worker=null;el<HTMLButtonElement>('generate-puzzle').disabled=false;el('cancel').hidden=true;el<HTMLButtonElement>('hint').disabled=false;el<HTMLButtonElement>('solve').disabled=false;}
+function stop(){clearTimeout(progressTimer);el("cancel-generation").hidden=true;if(preview){preview=null;render();}worker?.terminate();worker=null;el<HTMLButtonElement>('generate-puzzle').disabled=false;el('cancel').hidden=true;el<HTMLButtonElement>('hint').disabled=false;el<HTMLButtonElement>('solve').disabled=false;}
 function save(){stop();el("walkthrough").hidden=true;el("generation-rating").hidden=true;undo.push({grid:cloneGrid(grid),clues:[...clues],score,history:[...history]});pending=null;}
 function resetRating(){score=0;history=[];pending=null}
 function edit(cell:number,digit:number){save();const values=Array.from(grid.values);values[cell]=digit;grid=gridFromValues(values);resetRating();render();status('Grid updated. Find a logical step or check its solutions.');}
 function render(){
+  const shownGrid = preview?.grid ?? grid;
+  const shownClues = preview?.clues ?? clues;
   const board=el('board');board.replaceChildren();
   const corner=document.createElement('div');corner.className='clue-label';corner.textContent='SUM';board.append(corner);
-  function clueInput(u:number){const input=document.createElement('input');input.className='clue';input.type='text';input.inputMode='numeric';input.maxLength=2;input.value=clues[u]===null?'':String(clues[u]);input.placeholder='·';input.setAttribute('aria-label',`${u<9?'Row':'Column'} ${u%9+1} sandwich clue`);input.onchange=()=>{const raw=input.value.trim(),v=raw===''?null:Number(raw);if(v!==null&&(!/^\d+$/.test(raw)||!Number.isInteger(v)||v<0||v>35)){status('Clues must be whole numbers from 0 to 35, or blank.');render();return}save();clues[u]=v;grid=gridFromValues(grid.values);resetRating();render();status('Clue updated.');};return input}
+  function clueInput(u:number){const input=document.createElement('input');input.className='clue';input.type='text';input.inputMode='numeric';input.maxLength=2;input.value=shownClues[u]===null?'':String(shownClues[u]);input.readOnly=!!preview;input.placeholder='·';input.setAttribute('aria-label',`${u<9?'Row':'Column'} ${u%9+1} sandwich clue`);input.onchange=()=>{const raw=input.value.trim(),v=raw===''?null:Number(raw);if(v!==null&&(!/^\d+$/.test(raw)||!Number.isInteger(v)||v<0||v>35)){status('Clues must be whole numbers from 0 to 35, or blank.');render();return}save();clues[u]=v;grid=gridFromValues(grid.values);resetRating();render();status('Clue updated.');};return input}
   for(let c=0;c<9;c++)board.append(clueInput(9+c));
   for(let r=0;r<9;r++){board.append(clueInput(r));for(let c=0;c<9;c++){
     const i=r*9+c,b=document.createElement('button');b.className='cell';b.dataset.cell=String(i);
     if(c%3===0)b.classList.add('box-left');if(r%3===0)b.classList.add('box-top');if(c===8)b.classList.add('edge-right');if(r===8)b.classList.add('edge-bottom');
     if(ring&&RING.includes(i))b.classList.add('ring-cell');if(ring&&CORNERS.includes(i))b.classList.add('corner-cell');if(i===selected)b.classList.add('selected');
     if(pending?.placements.some(x=>x.cell===i)||pending?.eliminations.some(x=>x.cell===i))b.classList.add('deduction');
-    b.setAttribute('aria-label',`Row ${r+1}, column ${c+1}, ${grid.values[i]||'empty'}`);b.setAttribute('aria-pressed',String(i===selected));
-    if(grid.values[i])b.textContent=String(grid.values[i]);else if(candidates)b.innerHTML=`<span class="pencils">${Array.from({length:9},(_,d)=>`<span>${digitsOf(grid.cands[i]).includes(d+1)?d+1:''}</span>`).join('')}</span>`;
+    b.setAttribute('aria-label',`Row ${r+1}, column ${c+1}, ${shownGrid.values[i]||'empty'}`);b.setAttribute('aria-pressed',String(i===selected));
+    if(shownGrid.values[i])b.textContent=String(shownGrid.values[i]);else if(candidates&&!preview)b.innerHTML=`<span class="pencils">${Array.from({length:9},(_,d)=>`<span>${digitsOf(grid.cands[i]).includes(d+1)?d+1:''}</span>`).join('')}</span>`;
     b.onclick=()=>{selected=i;render();el('board').querySelector<HTMLButtonElement>(`[data-cell="${i}"]`)?.focus()};board.append(b);
   }}
-  el('filled').textContent=`${grid.values.filter(Boolean).length} / 81 filled`;el('score').textContent=String(score);el('step-count').textContent=`${history.length} steps`;
+  el('filled').textContent=`${shownGrid.values.filter(Boolean).length} / 81 filled`;el('score').textContent=String(score);el('step-count').textContent=`${history.length} steps`;
   el('notes').setAttribute('aria-pressed',String(candidates));el('ring').setAttribute('aria-pressed',String(ring));
   el('history').replaceChildren(...history.map(m=>{const li=document.createElement('li');li.textContent=`${m.name} (+${m.score}) — ${m.description}`;return li}));
   el('hint-detail').replaceChildren();if(pending){const p=document.createElement('p');p.textContent=`${pending.name} (+${pending.score}): ${pending.description}`;const b=document.createElement('button');b.textContent='Apply this step';b.className='primary';b.onclick=()=>{const move=pending!;save();applyMove(grid,move);history.push(move);score+=move.score;render();status(isSolved(grid)?'Grid filled. Use Solve & check uniqueness to verify.':'Step applied. Find the next deduction when ready.');};el('hint-detail').append(p,b)}
@@ -54,10 +58,32 @@ el('generate-puzzle').onclick = () => {
   el<HTMLButtonElement>('generate-puzzle').disabled = true;
   el<HTMLButtonElement>('hint').disabled = true;
   el<HTMLButtonElement>('solve').disabled = true;
-  el('cancel').hidden = false;
+  el('cancel-generation').hidden = false;
   status('Removing digits and checking uniqueness…');
   worker = new Worker(new URL('./worker.ts', import.meta.url), {type: 'module'});
+  const updates: (() => void)[] = [];
+  let playing = false;
+  const play = () => {
+    const update = updates.shift();
+    if (!update) { playing = false; return; }
+    playing = true;
+    progressTimer = setTimeout(() => { update(); play(); }, 45);
+  };
   worker.onmessage = ({data}) => {
+    if (data.progress) {
+      const {values, clues, phase} = data.progress;
+      updates.push(() => {
+        preview = {grid: gridFromValues(values), clues};
+        render();
+        status(phase === 'rating' ? 'Checking the logical solve…'
+          : phase === 'clues' ? 'Removing sandwich sums…' : 'Removing digits…');
+      });
+    } else {
+      updates.push(() => finish(data));
+    }
+    if (!playing) play();
+  };
+  const finish = (data: {error?: string; result: ReturnType<typeof import('./sandwich').generatePuzzle>}) => {
     stop();
     if (data.error) { status(data.error); return; }
     save();
@@ -80,7 +106,7 @@ el('generate-puzzle').onclick = () => {
       }
       report.append(list);
     }
-    mountWalkthrough(el("walkthrough"), grid, clues, rating?.moves ?? [], data.result.solution);
+    mountWalkthrough(el("walkthrough"), grid, clues, rating?.moves ?? [], data.result.solution ?? undefined);
     status(data.result.fullyDug
       ? 'Fully dug with exactly one solution. Every remaining removal allowed by your settings would break uniqueness.'
       : 'Exactly one solution. Full digging could not be verified because some removal checks reached the search limit.');
@@ -91,6 +117,7 @@ el('generate-puzzle').onclick = () => {
   };
   worker.postMessage({action: 'generate-puzzle', logicalOnly: el<HTMLInputElement>('logical-only').checked, rotational: el<HTMLInputElement>('rotational').checked, digClues: el<HTMLInputElement>('dig-clues').checked});
 };
+el('cancel-generation').onclick = () => { stop(); status('Generation cancelled. Your previous grid was restored.'); };
 el('blank').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));clues=new Array(18).fill(null);resetRating();render();status('Enter givens and outside clues to build a sandwich puzzle.')};
 el('clear').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));resetRating();render();status('Digits cleared; sandwich clues retained. Clues alone may allow multiple solutions.')};
 el('undo').onclick=()=>{const old=undo.pop();if(old){stop();el('walkthrough').hidden=true;el('generation-rating').hidden=true;({grid,clues,score,history}=old);pending=null;render();status('Last change undone.')}};
