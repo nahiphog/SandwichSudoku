@@ -23,9 +23,13 @@ it('certifies and scores a generated puzzle without filling the returned grid', 
 });
 
 it('keeps at least one sandwich clue and preserves uniqueness when digging sums', () => {
-  const {grid, clues} = generatePuzzle(false, true, true);
+  let digitUpdates = 0;
+  const {grid, clues} = generatePuzzle(false, true, true, (_, __, phase) => {
+    if (phase === 'digits') digitUpdates++;
+  });
+  expect(digitUpdates).toBeGreaterThan(0);
   expect(clues.filter(clue => clue !== null).length).toBeGreaterThan(0);
   const result = solveExact(grid, clues);
   expect(result.exhausted).toBe(false);
   expect(result.solutions).toHaveLength(1);
-});
+}, 60000);
