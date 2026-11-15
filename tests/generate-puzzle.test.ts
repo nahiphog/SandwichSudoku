@@ -21,3 +21,11 @@ it('certifies and scores a generated puzzle without filling the returned grid', 
   expect(rating?.techniques.length).toBeGreaterThan(0);
   expect(rating?.techniques.map(([name]) => name)).not.toContain('Brute Force');
 });
+
+it('keeps at least one sandwich clue and preserves uniqueness when digging sums', () => {
+  const {grid, clues} = generatePuzzle(false, true, true);
+  expect(clues.filter(clue => clue !== null).length).toBeGreaterThan(0);
+  const result = solveExact(grid, clues);
+  expect(result.exhausted).toBe(false);
+  expect(result.solutions).toHaveLength(1);
+});

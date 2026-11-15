@@ -3,6 +3,7 @@ const pages = [
   ['import-grid', 'Import grid'],
   ['techniques', 'Techniques'],
   ['simulation', 'Simulation'],
+  ['about', 'About'],
   ['custom-build', 'Custom build'],
 ] as const;
 
@@ -24,7 +25,8 @@ export function mountPages() {
     <button class="primary">Run simulation</button><button type="button" hidden>Cancel</button></form>
     <p role="status"></p><button id="simulation-export" hidden>Download results CSV</button>
     <div class="simulation-table"><table hidden><thead><tr><th>Sample</th><th>Givens</th><th>Result</th><th>Milliseconds</th></tr></thead><tbody></tbody></table></div>`;
-  main.append(simulation);
+  const about = workspace.querySelector<HTMLElement>('.rules')!;
+  main.append(simulation, about);
   const form = simulation.querySelector('form')!;
   const start = form.querySelector('button')!;
   const cancel = form.querySelector<HTMLButtonElement>('button[type=button]')!;
@@ -99,11 +101,12 @@ export function mountPages() {
       techniques: 'Explore the solver’s techniques and their difficulty scores.',
       'custom-build': 'Edit digits and outside clues, then check your puzzle for uniqueness.',
       simulation: '',
+      about: '',
     })[page];
     description.hidden = page === 'generate';
     generate.hidden = page !== 'generate';
     workspace.hidden = !hasBoard;
-    lower.hidden = page === 'simulation';
+    lower.hidden = page === 'simulation' || page === 'about';
     history.hidden = !hasBoard;
     techniques.hidden = page !== 'techniques';
     techniques.open = page === 'techniques';
@@ -116,6 +119,7 @@ export function mountPages() {
       main.insertBefore(workspace, lower);
     }
     simulation.hidden = page !== 'simulation';
+    about.hidden = page !== 'about';
     document.title = `${label} · Sandwich Sudoku Studio`;
   }
   nav.addEventListener('click', event => {

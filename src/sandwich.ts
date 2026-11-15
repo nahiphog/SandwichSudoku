@@ -25,7 +25,7 @@ export function generate(): Grid {
   return fill(gridFromValues(new Array(81).fill(0)))!;
 }
 /** Keep each removal only when exact search proves the remaining puzzle unique. */
-function digPuzzle(rotational: boolean) {
+function digPuzzle(rotational: boolean, digClues: boolean) {
   const solution = generate();
   const clues = cluesFor(solution.values);
   const values = Array.from(solution.values);
@@ -41,29 +41,44 @@ function digPuzzle(rotational: boolean) {
       for (const cell of group) values[cell] = solution.values[cell];
     }
   }
-  return {grid: gridFromValues(values), clues, fullyDug};
+  const grid = gridFromValues(values);
+  if (digClues) {
+    let remaining = clues.length;
+    for (const index of shuffle(Array.from(clues.keys()))) {
+      if (remaining === 1) break;
+      const clue = clues[index];
+      clues[index] = null;
+      const check = solveExact(grid, clues, 250);
+      if (check.exhausted) fullyDug = false;
+      if (!check.exhausted && check.solutions.length === 1) remaining--;
+      else clues[index] = clue;
+    }
+  }
+  return {grid, clues, fullyDug, solution: solution.values};
 }
 
 export function rateLogicalPuzzle(input: Grid, clues: Clues) {
   const grid = cloneGrid(input);
   const techniques = new Map<string, number>();
+  const moves: Move[] = [];
   let score = 0;
   while (!isSolved(grid)) {
     const move = nextMove(grid, clues);
     if (!move) return null;
+    moves.push(move);
     applyMove(grid, move);
     techniques.set(move.name, (techniques.get(move.name) ?? 0) + 1);
     score += move.score;
   }
   validate(grid, clues);
-  return {score, techniques: [...techniques]};
+  return {score, techniques: [...techniques], moves};
 }
 
-export function generatePuzzle(logicalOnly = false, rotational = true) {
+export function generatePuzzle(logicalOnly = false, rotational = true, digClues = false) {
   for (let attempt = 0; attempt < 10; attempt++) {
-    const puzzle = digPuzzle(rotational);
+    const puzzle = digPuzzle(rotational, digClues);
     const rating = rateLogicalPuzzle(puzzle.grid, puzzle.clues);
-    if (!logicalOnly || rating) return {...puzzle, rating};
+    if (!logicalOnly || rating) return {...puzzle, rating, solution: rating ? null : puzzle.solution};
   }
   throw new Error('No puzzle with a complete logical solve was found. Try generating again.');
 }
