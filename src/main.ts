@@ -110,13 +110,17 @@ el('generate-puzzle').onclick = () => {
       for (const [name, count] of rating.techniques) {
         const item = document.createElement('li');
         const instances = rating.moves
-          .map((move, index) => ({name: move.name, step: index + 1}))
+          .map((move, index) => ({name: move.name, step: index + 1, score: move.score}))
           .filter(move => move.name === name);
         const technique = document.createElement('button');
         technique.className = 'technique-step-link';
-        technique.textContent = `${name} × ${count}`;
+        technique.textContent = name;
         technique.onclick = () => walkthrough.goToStep(instances[0].step);
         item.append(technique);
+        const breakdown = document.createElement('span');
+        const subtotal = instances.reduce((sum, instance) => sum + instance.score, 0);
+        breakdown.textContent = ` — +${instances[0].score} × ${count} ${count === 1 ? 'instance' : 'instances'} = ${subtotal} points. Steps `;
+        item.append(breakdown);
         instances.forEach(({step}, index) => {
           const link = document.createElement('button');
           link.className = 'technique-step-link';
