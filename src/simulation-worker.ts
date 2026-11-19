@@ -1,11 +1,11 @@
 import {generateSimulationPuzzle} from './sandwich';
 import {countGivens, type SimulationTrial} from './simulation-data';
 
-self.onmessage = ({data: {trials, clueType, maxGivens}}) => {
+self.onmessage = ({data: {trials, clueType, maxGivens, gridFirst}}) => {
   try {
     for (let trial = 1; trial <= trials; trial++) {
       const start = performance.now();
-      const {grid, clues, fullyDug} = generateSimulationPuzzle(clueType);
+      const {grid, clues, fullyDug} = generateSimulationPuzzle(clueType, Boolean(gridFirst));
       const givens = countGivens(grid.values, clues);
       const result: SimulationTrial = {
         trial, givens, generatedAt: new Date().toISOString(),

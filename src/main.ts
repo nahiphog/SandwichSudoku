@@ -187,7 +187,28 @@ el('generate-puzzle').onclick = () => {
 };
 el('custom-generate').onclick = () => el('generate-puzzle').click();
 el('custom-clear').onclick = () => {customCells.clear();customSums.clear();render()};
-window.addEventListener('pagechange', render);
+let previousPage: string | undefined;
+window.addEventListener('pagechange', () => {
+  const page = document.body.dataset.page;
+  if (page === 'custom-build' && previousPage !== 'custom-build') {
+    stop();
+    grid = gridFromValues(new Array(81).fill(0));
+    clues = new Array(clueCount(clueType)).fill(null);
+    customCells.clear();
+    customSums.clear();
+    undo.length = 0;
+    candidates = false;
+    selected = 40;
+    resetRating();
+    el('walkthrough').hidden = true;
+    el('generation-rating').hidden = true;
+    el('generation-time').hidden = true;
+    el<HTMLTextAreaElement>('data').value = '';
+    status('Highlight cells and outside clue positions to build a new puzzle.');
+  }
+  previousPage = page;
+  render();
+});
 function cancelGeneration() {
   const visiblePuzzle = preview;
   if (!visiblePuzzle) {

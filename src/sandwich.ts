@@ -122,9 +122,9 @@ function digPuzzle(logicalOnly: boolean, rotational: boolean, digClues: boolean 
   return {grid, clues, fullyDug, rating, solution: solution.values};
 }
 
-/** Simulation uses unrestricted, mixed, single-given digging without logical rating. */
-export function generateSimulationPuzzle(clueType: ClueType = 'sandwich') {
-  const {grid, clues, fullyDug} = digPuzzle(false, false, 'single', undefined, clueType, false);
+/** Simulation uses unrestricted single-given digging with selectable order and no logical rating. */
+export function generateSimulationPuzzle(clueType: ClueType = 'sandwich', gridFirst = false) {
+  const {grid, clues, fullyDug} = digPuzzle(false, false, 'single', undefined, clueType, gridFirst);
   return {grid, clues, fullyDug};
 }
 

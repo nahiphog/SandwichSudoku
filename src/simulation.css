@@ -5,3 +5,5 @@
 .simulation-puzzles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.simulation-puzzle{border:1px solid #d9e0d8;border-radius:10px;padding:16px;min-width:0}
 .simulation-puzzle h3{font-size:14px;margin:0 0 8px}.simulation-puzzle time{font-size:12px;color:#6b766d}.simulation-puzzle>[role=status]{display:block;font-size:12px;margin-top:8px}.simulation-puzzle .walkthrough-grid{width:100%;max-width:480px}
 @media(max-width:760px){.simulation-puzzles{grid-template-columns:1fr}.simulation{padding:16px}.simulation form>label{width:100%}}
+
+.simulation form>.simulation-grid-first{display:flex;align-items:center;gap:8px}.simulation .simulation-grid-first input{width:auto;padding:0;flex:none}

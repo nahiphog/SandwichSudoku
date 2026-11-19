@@ -98,7 +98,9 @@ Total trials offers 1, 10, 100, 1,000, 10,000, 100,000, and 1,000,000 (default).
 The display limit ranges from 1 to 60 total givens (default 60), counting grid
 digits and every outside clue, including zero. Each trial uses unrestricted
 logical/brute-force digging, no rotational symmetry, single outside-clue
-removals, and mixed grid/outside selection. Logical rating is skipped.
+removals, and mixed grid/outside selection by default. Enable **Dig the cells
+inside the grid first** to finish grid digging before attempting outside clues.
+Logical rating is skipped.
 
 The vertical-bar histogram updates after every completed puzzle. Matching
 puzzles are retained in memory and paginated ten per page, with generation
@@ -106,3 +108,7 @@ time in Malaysia time, total givens, and a clipboard button for importable JSON.
 Cancellation retains completed results; a new run or reload clears them.
 Histogram counts can be downloaded as CSV. Digging search-limit cases remain
 verified unique and are labelled separately from fully dug puzzles.
+
+Entering Custom Build starts a fresh blank grid and clears outside clues,
+highlights, candidates, undo history, and previous solve reports. In-flight
+generation is cancelled so it cannot refill the new construction.

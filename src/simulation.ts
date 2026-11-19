@@ -16,8 +16,9 @@ export function mountSimulation(): HTMLElement {
     </select></fieldset>
     <label>Total trials <select name="trials">${TRIAL_OPTIONS.map(value => `<option value="${value}" ${value === DEFAULT_TRIALS ? 'selected' : ''}>${value.toLocaleString('en-US')}</option>`).join('')}</select></label>
     <label>Display grid with at most <select name="maxGivens" aria-label="Maximum givens to display">${Array.from({length: 60}, (_, i) => `<option value="${i + 1}" ${i === 59 ? 'selected' : ''}>${i + 1}</option>`).join('')}</select> cells (numbers inside the grid and outside the grid)</label>
+    <label class="simulation-grid-first"><input type="checkbox" name="gridFirst"> Dig the cells inside the grid first</label>
     <button class="primary" type="submit">Run simulation</button><button type="button" class="simulation-cancel" hidden>Cancel</button></form>
-    <p class="simulation-settings">No brute force method: off · Rotational symmetry: off · Outside clues: dig one at a time · Dig grid cells first: off</p>
+    <p class="simulation-settings">No brute force method: off · Rotational symmetry: off · Outside clues: dig one at a time</p>
     <p role="status" class="simulation-status">Ready to run.</p>
     <section class="simulation-results" hidden><h2>Givens histogram</h2>
       <p class="simulation-summary"></p><div class="simulation-histogram"></div>
@@ -49,7 +50,7 @@ export function mountSimulation(): HTMLElement {
     status.textContent = message;
     start.disabled = false;
     cancel.hidden = true;
-    form.querySelectorAll('select').forEach(select => { select.disabled = false; });
+    form.querySelectorAll<HTMLSelectElement | HTMLInputElement>('select, input').forEach(select => { select.disabled = false; });
   }
 
   function renderHistogram() {
@@ -129,13 +130,14 @@ export function mountSimulation(): HTMLElement {
     const data = new FormData(form);
     requested = Number(data.get('trials'));
     threshold = Number(data.get('maxGivens'));
+    const gridFirst = data.get('gridFirst') === 'on';
     clueType = data.get('clueType') as ClueType;
     matches = []; completed = page = limited = 0; renderedMatchesKey = '';
     bins = new Array(82 + clueCount(clueType)).fill(0);
     get<HTMLElement>('.simulation-results').hidden = false;
     renderHistogram(); renderMatches();
     start.disabled = true; cancel.hidden = false;
-    form.querySelectorAll('select').forEach(select => { select.disabled = true; });
+    form.querySelectorAll<HTMLSelectElement | HTMLInputElement>('select, input').forEach(select => { select.disabled = true; });
     status.textContent = `Running 0 of ${requested.toLocaleString()} trials…`;
     runner = new Worker(new URL('./simulation-worker.ts', import.meta.url), {type: 'module'});
     runner.onmessage = ({data: result}: MessageEvent<SimulationTrial & {error?: string}>) => {
@@ -151,7 +153,7 @@ export function mountSimulation(): HTMLElement {
       else status.textContent = `Running ${completed.toLocaleString()} of ${requested.toLocaleString()} trials…`;
     };
     runner.onerror = () => stop('Simulation stopped after a calculation error. Completed results are retained.');
-    runner.postMessage({trials: requested, maxGivens: threshold, clueType});
+    runner.postMessage({trials: requested, maxGivens: threshold, clueType, gridFirst});
   };
   cancel.onclick = () => stop(`Simulation cancelled after ${completed.toLocaleString()} completed trials. Results are retained.`);
   get<HTMLButtonElement>('.simulation-export').onclick = () => {
