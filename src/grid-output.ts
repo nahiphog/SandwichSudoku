@@ -26,12 +26,22 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
           tile.textContent = r < 0 && c < 0 ? '' : String(clues[r < 0 ? 9 + c : r] ?? '');
         } else {
           const cell = r * 9 + c;
-          tile.textContent = grid.values[cell]
-            ? String(grid.values[cell])
-            : step ? digitsOf(grid.cands[cell]).join('') : '';
-          if (!grid.values[cell]) tile.style.fontSize = 'clamp(5px, 0.8vw, 10px)';
+          if (grid.values[cell]) {
+            tile.textContent = String(grid.values[cell]);
+          } else {
+            const candidates = document.createElement('span');
+            candidates.className = 'walkthrough-candidates';
+            const digits = digitsOf(grid.cands[cell]);
+            for (let digit = 1; digit <= 9; digit++) {
+              const mark = document.createElement('span');
+              mark.textContent = digits.includes(digit) ? String(digit) : '';
+              candidates.append(mark);
+            }
+            tile.append(candidates);
+          }
           tile.title = cellName(cell);
-          tile.className = ['cell', r % 3 === 0 && 'box-top', c % 3 === 0 && 'box-left',
+          tile.className = ['cell', !puzzle.values[cell] && 'walkthrough-entry',
+            r % 3 === 0 && 'box-top', c % 3 === 0 && 'box-left',
             r === 8 && 'edge-bottom', c === 8 && 'edge-right',
             changes.some(change => change.cell === cell) && 'deduction'].filter(Boolean).join(' ');
         }
