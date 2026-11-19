@@ -47,7 +47,7 @@ function stopGenerationTimer() {
   el('custom-generate').textContent = 'Build from highlighted entries';
   for (const id of ['generate-puzzle', 'custom-generate']) el(id).classList.remove('cancel-generation');
 }
-function stop(){clearTimeout(progressTimer);stopGenerationTimer();if(preview){preview=null;render();}worker?.terminate();worker=null;el<HTMLButtonElement>('generate-puzzle').disabled=false;el('cancel').hidden=true;el<HTMLButtonElement>('hint').disabled=false;el<HTMLButtonElement>('solve').disabled=false;}
+function stop(){const fallback=el<HTMLButtonElement>('brute-force-continue');if(fallback)fallback.disabled=false;clearTimeout(progressTimer);stopGenerationTimer();if(preview){preview=null;render();}worker?.terminate();worker=null;el<HTMLButtonElement>('generate-puzzle').disabled=false;el('cancel').hidden=true;el<HTMLButtonElement>('hint').disabled=false;el<HTMLButtonElement>('solve').disabled=false;}
 function save(){stop();el("walkthrough").hidden=true;el("generation-rating").hidden=true;undo.push({grid:cloneGrid(grid),clues:[...clues],score,history:[...history],clueType});pending=null;}
 function resetRating(){score=0;history=[];pending=null}
 function edit(cell:number,digit:number){save();const values=Array.from(grid.values);values[cell]=digit;grid=gridFromValues(values);resetRating();render();status('Grid updated. Find a logical step or check its solutions.');}
@@ -135,6 +135,18 @@ el('generate-puzzle').onclick = () => {
     const title = document.createElement('h3');
     title.textContent = rating ? `Total difficulty score: ${rating.score}` : 'Logical solve stalled';
     report.append(title);
+    if (!rating) {
+      const explanation = document.createElement('p');
+      explanation.textContent = 'All supported logical techniques have been exhausted. Brute force is available as a last resort to complete the grid and verify uniqueness.';
+      const fallback = document.createElement('button');
+      fallback.id = 'brute-force-continue';
+      fallback.textContent = 'Use brute force to continue';
+      fallback.onclick = () => {
+        run('solve');
+        fallback.disabled = true;
+      };
+      report.append(explanation, fallback);
+    }
     if (rating) {
       const table = document.createElement('table');
       table.className = 'difficulty-techniques';
