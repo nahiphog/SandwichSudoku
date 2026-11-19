@@ -1,4 +1,5 @@
 import {TECHS} from './vendor/engine/ratings';
+import {DISPLAYED_TECHNIQUES} from './techniques';
 import {pages, pagePath, resolvePage} from './routes';
 
 // Both source modules and built assets live one directory below the app root.
@@ -21,10 +22,10 @@ export function mountPages() {
   techniques.className = 'card';
   techniques.innerHTML = '<h2>Techniques</h2><div class="tech-list"></div>';
   const entries = [
-    ...Object.values(TECHS).map(tech => ({
+    ...DISPLAYED_TECHNIQUES.map(id => TECHS[id]).map(tech => ({
       name: tech.name, score: tech.score,
       status: !tech.implemented ? 'Unavailable' : tech.name === 'Brute Force' ? 'Optional' :
-        tech.score >= 300 ? 'Disabled' : tech.category === 'Uniqueness' ? 'Classic only' :
+        tech.category === 'Uniqueness' ? 'Classic only' :
         !tech.enabled ? 'Disabled' : 'Enabled',
     })),
     {name: 'Sandwich sum', score: 5, status: 'Enabled'},

@@ -34,3 +34,5 @@ body[data-page=generate] .intro{margin-bottom:20px}
 .generation-actions select{font-size:12px;max-width:230px;background:#fffefa;color:inherit}
 .rules h2:not(:first-child){margin-top:30px}
 @media(max-width:760px){.generation-actions{gap:12px}.generation-actions>label:last-of-type{flex-basis:100%}.generation-actions select{min-width:0;max-width:100%}}
+
+.generation-actions>button.cancel-generation{background:#b63838;border-color:#b63838;color:#fff}.generation-actions>button.cancel-generation:hover{background:#942b2b;border-color:#942b2b}#generation-time{order:3;flex-basis:100%;font-size:12px;color:#6b766d;font-variant-numeric:tabular-nums}.panel-top{flex-wrap:wrap;gap:8px}

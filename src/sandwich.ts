@@ -1,6 +1,7 @@
 import { type Grid, UNITS, bit, digitsOf, cloneGrid, gridFromValues, isBroken, isSolved, setValue } from './vendor/engine/board';
 import { findNextStep, applyStep } from './vendor/engine/humanSolver';
-import { TECHS, SOLVE_ORDER } from './vendor/engine/ratings';
+import { TECHS } from './vendor/engine/ratings';
+import { LOGICAL_ORDER } from './techniques';
 import type { CellDigit } from './vendor/engine/steps';
 
 export type ClueType = "sandwich" | "edge-difference";
@@ -185,7 +186,7 @@ export function ringMove(g:Grid):Move|null {
     if(placements.length||eliminations.length)return {primary: RING.flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))), secondary: CORNERS.flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:'Phistomefel Ring',score:200,description:`The ring and corners contain the same number of ${digit}s. Their shared count is between ${lo} and ${hi}; a saturated count removes candidates, and a required count forces the remaining positions.`,placements,eliminations};
   }return null;
 }
-export const SAFE_ORDER=SOLVE_ORDER.filter(t=>TECHS[t].category!=='Uniqueness' && TECHS[t].score < 300);
+export const SAFE_ORDER = LOGICAL_ORDER;
 export function nextMove(g:Grid,clues:Clues, clueType: ClueType = 'sandwich'):Move|null {
   if(isBroken(g))throw new Error('The grid has conflicting digits or no valid candidates.');
   const sandwich=sandwichMove(g,clues,clueType);

@@ -11,10 +11,12 @@ const customCells = new Set<number>();
 const customSums = new Set<number>();
 let preview: {grid: Grid; clues: Clues} | null = null;
 let progressTimer: ReturnType<typeof setTimeout> | undefined;
+let generationStarted: number | null = null;
+let elapsedTimer: ReturnType<typeof setInterval> | undefined;
 const undo:{grid:Grid;clues:Clues;score:number;history:Move[];clueType:ClueType}[]=[];
 const app=document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML=`<header><a class="brand" href="${appBase}"><img src="${appBase}sandwich.svg" width="38" height="38" alt=""> Sandwich Sudoku</a></header>
-<main><section class="intro"><div><h1>Generate</h1><p hidden></p></div><div class="generation-actions"><label><input id="logical-only" type="checkbox" checked> No brute force method</label><label><input id="rotational" type="checkbox" checked> Rotational symmetry</label><label>Outside clues <select id="dig-clues"><option value="none">Do not dig outside clues</option><option value="single" selected>Dig outside clues one at a time</option><option value="pairs">Dig outside clues in pairs</option></select></label><button id="generate-puzzle" class="primary">Generate puzzle</button><button id="custom-generate" hidden>Build from highlighted entries</button><button id="custom-clear" hidden>Clear highlights</button><button id="cancel-generation" hidden>Cancel</button></div></section>
+<main><section class="intro"><div><h1>Generate</h1><p hidden></p></div><div class="generation-actions"><label><input id="logical-only" type="checkbox" checked> No brute force method</label><label><input id="rotational" type="checkbox" checked> Rotational symmetry</label><label>Outside clues <select id="dig-clues"><option value="none">Do not dig outside clues</option><option value="single" selected>Dig outside clues one at a time</option><option value="pairs">Dig outside clues in pairs</option></select></label><button id="generate-puzzle" class="primary">Generate puzzle</button><button id="custom-generate" hidden>Build from highlighted entries</button><button id="custom-clear" hidden>Clear highlights</button><span id="generation-time" role="timer" aria-label="Generation elapsed time" hidden></span></div></section>
 <div class="workspace"><section class="board-panel"><fieldset id="clue-type" class="clue-switch" aria-describedby="clue-help"><legend>Choose your puzzle type</legend><div class="clue-options"><label><input type="radio" name="clue-type" value="sandwich" checked><span>Sandwich sums</span></label><label><input type="radio" name="clue-type" value="edge-difference"><span>Edge difference</span></label></div><p id="clue-help"></p></fieldset><div class="panel-top"><div><span class="dot"></span><strong id="board-title">Your grid</strong></div><span id="filled"></span></div><div class="board-wrap"><div id="board" role="group" aria-label="Editable sandwich sudoku grid"></div></div><div class="board-tools"><button id="notes" aria-pressed="false">Candidates</button><button id="undo">↶ Undo</button></div><div class="board-tools copy-tools"><button id="copy-string">Copy grid string</button><button id="copy-image">Copy grid image</button></div><div class="keypad">${Array.from({length:9},(_,i)=>`<button data-digit="${i+1}" aria-label="Enter ${i+1}">${i+1}</button>`).join('')}<button data-digit="0" aria-label="Erase selected cell">⌫</button></div><p class="board-caption">Select a cell to edit · 1–9 to enter · Delete to erase · Arrow keys to move</p></section>
 <aside><section class="card rules"><h2>Sandwich sudoku</h2><p>Normal sudoku rules apply. Clues outside the grid give the sum of digits <strong>between 1 and 9</strong> in that row or column, not including the 1 and 9 themselves.</p><div class="example"><span>1</span><b>3</b><b>5</b><b>2</b><span>9</span><em> = 10</em></div><small>Only the filling counts. Adjacent 1 and 9 give 0.</small><h2>Edge difference sudoku</h2><p>Normal sudoku rules apply. Each outside clue gives the <strong>absolute difference between the two end cells</strong>. Left clues compare the first and last cells of a row; top clues compare the top and bottom cells of a column.</p><div class="example"><span>9</span><em> − </em><span>2</span><em> = 7</em></div><small>Either order works: |2 − 9| is also 7. Clues range from 1 to 8.</small></section>
 <section class="card"><div class="card-heading"><h2>Solving desk</h2><span class="badge"><b id="score">0</b> points</span></div><p id="status" role="status" aria-live="polite">Generate a puzzle or enter your own digits and clues.</p><div class="actions"><button id="hint" class="primary">Find next step →</button><button id="solve">Solve & check uniqueness</button><button id="cancel" hidden>Cancel calculation</button></div><div id="generation-rating" hidden></div><div id="hint-detail"></div><div class="minor-actions"><button id="blank">Blank grid</button><button id="clear">Clear digits, keep clues</button></div></section>
@@ -23,7 +25,29 @@ app.innerHTML=`<header><a class="brand" href="${appBase}"><img src="${appBase}sa
 </main>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 function status(s:string){el('status').textContent=s}
-function stop(){clearTimeout(progressTimer);el("cancel-generation").hidden=true;if(preview){preview=null;render();}worker?.terminate();worker=null;el<HTMLButtonElement>('generate-puzzle').disabled=false;el('cancel').hidden=true;el<HTMLButtonElement>('hint').disabled=false;el<HTMLButtonElement>('solve').disabled=false;}
+function updateGenerationTime() {
+  if (generationStarted === null) return;
+  el('generation-time').textContent = `Elapsed time: ${((performance.now() - generationStarted) / 1000).toFixed(1)} s`;
+}
+function startGenerationTimer() {
+  generationStarted = performance.now();
+  el('generation-time').hidden = false;
+  updateGenerationTime();
+  elapsedTimer = setInterval(updateGenerationTime, 100);
+  for (const id of ['generate-puzzle', 'custom-generate']) {
+    el(id).textContent = 'Cancel';
+    el(id).classList.add('cancel-generation');
+  }
+}
+function stopGenerationTimer() {
+  updateGenerationTime();
+  clearInterval(elapsedTimer);
+  generationStarted = null;
+  el('generate-puzzle').textContent = 'Generate puzzle';
+  el('custom-generate').textContent = 'Build from highlighted entries';
+  for (const id of ['generate-puzzle', 'custom-generate']) el(id).classList.remove('cancel-generation');
+}
+function stop(){clearTimeout(progressTimer);stopGenerationTimer();if(preview){preview=null;render();}worker?.terminate();worker=null;el<HTMLButtonElement>('generate-puzzle').disabled=false;el('cancel').hidden=true;el<HTMLButtonElement>('hint').disabled=false;el<HTMLButtonElement>('solve').disabled=false;}
 function save(){stop();el("walkthrough").hidden=true;el("generation-rating").hidden=true;undo.push({grid:cloneGrid(grid),clues:[...clues],score,history:[...history],clueType});pending=null;}
 function resetRating(){score=0;history=[];pending=null}
 function edit(cell:number,digit:number){save();const values=Array.from(grid.values);values[cell]=digit;grid=gridFromValues(values);resetRating();render();status('Grid updated. Find a logical step or check its solutions.');}
@@ -52,7 +76,7 @@ function render(){
     if(document.body.dataset.page==='custom-build'&&customCells.has(i))b.classList.add('custom-highlight');
     b.onclick=()=>{if(document.body.dataset.page==='custom-build'){customCells.has(i)?customCells.delete(i):customCells.add(i)}selected=i;render();el('board').querySelector<HTMLButtonElement>(`[data-cell="${i}"]`)?.focus()};board.append(b);
   }}
-  el('filled').textContent=`${shownGrid.values.filter(Boolean).length} / 81 filled`;el('score').textContent=String(score);el('step-count').textContent=`${history.length} steps`;
+  el('filled').textContent=`${shownGrid.values.filter(Boolean).length} / 81 filled · ${shownClues.filter(clue => clue !== null).length} outside clues`;el('score').textContent=String(score);el('step-count').textContent=`${history.length} steps`;
   el('notes').setAttribute('aria-pressed',String(candidates));
   el('history').replaceChildren(...history.map(m=>{const li=document.createElement('li');li.textContent=`${m.name} (+${m.score}) — ${m.description}`;return li}));
   el('hint-detail').replaceChildren();if(pending){const p=document.createElement('p');p.textContent=`${pending.name} (+${pending.score}): ${pending.description}`;const b=document.createElement('button');b.textContent='Apply this step';b.className='primary';b.onclick=()=>{const move=pending!;save();applyMove(grid,move);history.push(move);score+=move.score;render();status(isSolved(grid)?'Grid filled. Use Solve & check uniqueness to verify.':'Step applied. Find the next deduction when ready.');};el('hint-detail').append(p,b)}
@@ -65,11 +89,11 @@ function run(action:'hint'|'solve'){
   worker.onerror=()=>{stop();status('Calculation failed. Your puzzle is unchanged; please try again.')};worker.postMessage({action,grid,clues,clueType});
 }
 el('generate-puzzle').onclick = () => {
+  if (generationStarted !== null) { cancelGeneration(); return; }
   stop();
-  el<HTMLButtonElement>('generate-puzzle').disabled = true;
+  startGenerationTimer();
   el<HTMLButtonElement>('hint').disabled = true;
   el<HTMLButtonElement>('solve').disabled = true;
-  el('cancel-generation').hidden = false;
   status('Removing digits and checking uniqueness…');
   worker = new Worker(new URL('./worker.ts', import.meta.url), {type: 'module'});
   const updates: (() => void)[] = [];
@@ -155,7 +179,7 @@ el('generate-puzzle').onclick = () => {
 el('custom-generate').onclick = () => el('generate-puzzle').click();
 el('custom-clear').onclick = () => {customCells.clear();customSums.clear();render()};
 window.addEventListener('pagechange', render);
-el('cancel-generation').onclick = () => {
+function cancelGeneration() {
   const visiblePuzzle = preview;
   if (!visiblePuzzle) {
     stop();

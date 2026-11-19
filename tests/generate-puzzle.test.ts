@@ -30,6 +30,7 @@ it.each(['sandwich', 'edge-difference'] as const)('preserves a logical solve aft
   expect(digits).toBeGreaterThan(0);
   expect(outside).toBeGreaterThan(0);
   expect(result.rating).toEqual(rateLogicalPuzzle(result.grid, result.clues, clueType));
+  expect(result.rating!.moves.every(move => move.score <= 200)).toBe(true);
 }, 60000);
 
 it('generates a unique logical edge difference puzzle with paired clue digging', () => {
