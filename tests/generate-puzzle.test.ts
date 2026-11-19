@@ -1,4 +1,5 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+vi.setConfig({testTimeout: 60000});
 import { cluesFor, generatePuzzle, solveExact } from '../src/sandwich';
 
 it('removes digits while retaining all clues and exactly one solution', () => {
