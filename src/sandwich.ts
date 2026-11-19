@@ -155,27 +155,44 @@ export function generatePuzzle(logicalOnly = false, rotational = true, digClues:
   return {...puzzle, rating, solution: rating ? null : puzzle.solution};
 }
 
+// Bound memory during long simulations; cache only mathematical line inputs.
+const lineSupportCache = new Map<string, number[] | null>();
 /** All compatible permutations of a line; union their candidates for sound eliminations. */
 export function lineSupport(g:Grid, cells:number[], clue:number, clueType: ClueType = 'sandwich'):number[]|null {
+  const key = clueType + ':' + clue + ':' + cells.map(cell => g.values[cell] ? bit(g.values[cell]) : g.cands[cell]).join(',');
+  if (lineSupportCache.has(key)) return lineSupportCache.get(key)?.slice() ?? null;
+  const support = computeLineSupport(g, cells, clue, clueType);
+  if (lineSupportCache.size >= 10000) lineSupportCache.delete(lineSupportCache.keys().next().value!);
+  lineSupportCache.set(key, support);
+  return support?.slice() ?? null;
+}
+function computeLineSupport(g:Grid, cells:number[], clue:number, clueType: ClueType):number[]|null {
   if (clueType === 'edge-difference') return edgeSupport(g, cells, clue);
   if (clueType === 'skyscraper') return skyscraperSupport(g, cells, clue);
   if (clueType === 'x-sums') return xSumSupport(g, cells, clue);
   if (clueType === 'sum-before-nine') return sumBeforeNineSupport(g, cells, clue);
-  const support=new Array<number>(9).fill(0), line=new Array<number>(9).fill(0);
-  let count=0;
-  const visit=(p:number,used:number,phase:number,sum:number):void=>{
-    if(sum>clue)return;
-    if(p===9){if(phase===2&&sum===clue){count++;line.forEach((d,j)=>support[j]|=bit(d))}return}
-    const mask=(g.values[cells[p]]?bit(g.values[cells[p]]):g.cands[cells[p]])&~used;
-    for(const d of digitsOf(mask)){
-      const bread=d===1||d===9;
-      const nextPhase=bread?phase+1:phase;
-      const nextSum=sum+(!bread&&phase===1?d:0);
-      if(nextPhase===2&&nextSum!==clue)continue;
-      line[p]=d;visit(p+1,used|bit(d),nextPhase,nextSum);
+  if (!Number.isInteger(clue) || clue < 0 || clue > 35) return null;
+  const support = new Array<number>(9).fill(0);
+  const masks = cells.map(cell => g.values[cell] ? bit(g.values[cell]) : g.cands[cell]);
+  const memo = new Map<number, boolean>();
+  function visit(p: number, used: number, phase: number, sum: number): boolean {
+    if (sum > clue || (phase === 2 && sum !== clue)) return false;
+    if (p === 9) return phase === 2 && sum === clue;
+    // Different prefixes with this state have exactly the same valid suffixes.
+    const key = (phase * 36 + sum) * 512 + used;
+    if (memo.has(key)) return memo.get(key)!;
+    let valid = false;
+    for (const digit of digitsOf(masks[p] & ~used)) {
+      const bread = digit === 1 || digit === 9;
+      if (visit(p + 1, used | bit(digit), phase + Number(bread), sum + (!bread && phase === 1 ? digit : 0))) {
+        support[p] |= bit(digit);
+        valid = true;
+      }
     }
-  };
-  visit(0,0,0,0);return count?support:null;
+    memo.set(key, valid);
+    return valid;
+  }
+  return visit(0, 0, 0, 0) ? support : null;
 }
 /** Memoized permutations enforce endpoint differences and distinct digits. */
 function edgeSupport(g: Grid, cells: number[], clue: number): number[] | null {

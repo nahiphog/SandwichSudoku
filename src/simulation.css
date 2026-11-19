@@ -7,3 +7,6 @@
 @media(max-width:760px){.simulation-puzzles{grid-template-columns:1fr}.simulation{padding:16px}.simulation form>label{width:100%}}
 
 .simulation form>.simulation-grid-first{display:flex;align-items:center;gap:8px}.simulation .simulation-grid-first input{width:auto;padding:0;flex:none}
+
+/* Explicit tracks prevent populated rows from stretching relative to empty rows. */
+.simulation-puzzle .walkthrough-grid{grid-template-columns:repeat(10,minmax(0,1fr));grid-template-rows:repeat(10,minmax(0,1fr));aspect-ratio:1;align-self:start}.simulation-puzzle .walkthrough-grid.four-sided-grid{grid-template-columns:repeat(11,minmax(0,1fr));grid-template-rows:repeat(11,minmax(0,1fr))}.simulation-puzzle .walkthrough-grid>*{min-width:0;min-height:0;overflow:hidden}
