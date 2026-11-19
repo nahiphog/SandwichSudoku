@@ -110,7 +110,7 @@ el('generate-puzzle').onclick = () => {
       table.className = 'difficulty-techniques';
       table.innerHTML = '<thead><tr><th scope="col">Technique</th><th scope="col">Steps</th></tr></thead>';
       const body = table.createTBody();
-      for (const [name] of rating.techniques) {
+      for (const [name, count] of rating.techniques) {
         const row = body.insertRow();
         const technique = document.createElement('th');
         technique.scope = 'row';
@@ -120,6 +120,11 @@ el('generate-puzzle').onclick = () => {
         const instances = rating.moves
           .map((move, index) => ({name: move.name, step: index + 1, score: move.score}))
           .filter(move => move.name === name);
+        const breakdown = document.createElement('small');
+        breakdown.className = 'technique-score-breakdown';
+        const subtotal = instances.reduce((sum, instance) => sum + instance.score, 0);
+        breakdown.textContent = `+${instances[0].score} × ${count} ${count === 1 ? 'instance' : 'instances'} = ${subtotal} points`;
+        technique.append(breakdown);
         instances.forEach(({step}, index) => {
           const link = document.createElement('button');
           link.className = 'technique-step-link';
