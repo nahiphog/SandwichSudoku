@@ -100,6 +100,7 @@ el('generate-puzzle').onclick = () => {
     render();
     const report = el('generation-rating');
     const rating = data.result.rating;
+    const walkthrough = mountWalkthrough(el("walkthrough"), grid, clues, rating?.moves ?? [], data.result.solution ?? undefined);
     report.hidden = false;
     report.replaceChildren();
     const title = document.createElement('h3');
@@ -109,12 +110,27 @@ el('generate-puzzle').onclick = () => {
       const list = document.createElement('ul');
       for (const [name, count] of rating.techniques) {
         const item = document.createElement('li');
-        item.textContent = `${name} × ${count}`;
+        const instances = rating.moves
+          .map((move, index) => ({name: move.name, step: index + 1}))
+          .filter(move => move.name === name);
+        const technique = document.createElement('button');
+        technique.className = 'technique-step-link';
+        technique.textContent = `${name} × ${count}`;
+        technique.onclick = () => walkthrough.goToStep(instances[0].step);
+        item.append(technique);
+        instances.forEach(({step}, index) => {
+          const link = document.createElement('button');
+          link.className = 'technique-step-link';
+          link.textContent = String(index + 1);
+          link.setAttribute('aria-label', `${name}, instance ${index + 1}, step ${step}`);
+          link.title = `Jump to step ${step}`;
+          link.onclick = () => walkthrough.goToStep(step);
+          item.append(' ', link);
+        });
         list.append(item);
       }
       report.append(list);
     }
-    mountWalkthrough(el("walkthrough"), grid, clues, rating?.moves ?? [], data.result.solution ?? undefined);
     status(data.result.fullyDug
       ? 'Fully dug with exactly one solution. Every remaining removal allowed by your settings would break uniqueness.'
       : 'Exactly one solution. Full digging could not be verified because some removal checks reached the search limit.');

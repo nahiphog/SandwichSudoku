@@ -107,6 +107,15 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
   finish.onclick = () => { step = end; render(); };
   panel.hidden = false;
   render();
+  return {
+    goToStep(target: number) {
+      step = Math.max(0, Math.min(end, target));
+      render();
+      panel.scrollIntoView({behavior: 'smooth', block: 'start'});
+      description.tabIndex = -1;
+      description.focus({preventScroll: true});
+    },
+  };
 }
 
 export async function copyGridText(grid: Grid, clues: Clues) {
