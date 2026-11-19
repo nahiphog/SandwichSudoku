@@ -2,7 +2,7 @@ import {applyMove, type Clues, type Move} from './sandwich';
 import {cellName, cloneGrid, digitsOf, type Grid} from './vendor/engine/board';
 
 export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues, moves: Move[], solution?: Uint8Array) {
-  panel.innerHTML = '<h2>Solution walkthrough</h2><p aria-live="polite"></p><div class="walkthrough-grid" aria-label="Walkthrough grid"></div><div class="walkthrough-nav"><button>Previous</button><button>Next</button><button>Show solution</button></div>';
+  panel.innerHTML = '<h2>Solution walkthrough</h2><p aria-live="polite"></p><small>Teal marks the pattern, amber marks supporting candidates, purple marks fins. Red struck-through candidates are eliminated in this step.</small><div class="walkthrough-grid" aria-label="Walkthrough grid"></div><div class="walkthrough-nav"><button>Previous</button><button>Next</button><button>Show solution</button></div>';
   const description = panel.querySelector('p')!;
   const board = panel.querySelector('.walkthrough-grid')!;
   const [previous, next, finish] = Array.from(panel.querySelectorAll('button'));
@@ -34,7 +34,19 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
             const digits = digitsOf(grid.cands[cell]);
             for (let digit = 1; digit <= 9; digit++) {
               const mark = document.createElement('span');
-              mark.textContent = digits.includes(digit) ? String(digit) : '';
+              const matches = (entries?: Move['primary']) =>
+                entries?.some(entry => entry.cell === cell && entry.digit === digit);
+              const eliminated = matches(move?.eliminations);
+              mark.textContent = digits.includes(digit) || eliminated ? String(digit) : '';
+              if (mark.textContent) {
+                mark.className = [
+                  matches(move?.primary) && 'candidate-primary',
+                  matches(move?.secondary) && 'candidate-secondary',
+                  matches(move?.fins) && 'candidate-fin',
+                  eliminated && 'candidate-eliminated',
+                ].filter(Boolean).join(' ');
+                mark.setAttribute('aria-label', `${cellName(cell)} candidate ${digit}${eliminated ? ', eliminated' : ''}`);
+              }
               candidates.append(mark);
             }
             tile.append(candidates);
@@ -43,6 +55,9 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
           tile.className = ['cell', !puzzle.values[cell] && 'walkthrough-entry',
             r % 3 === 0 && 'box-top', c % 3 === 0 && 'box-left',
             r === 8 && 'edge-bottom', c === 8 && 'edge-right',
+            move?.primary?.some(entry => entry.cell === cell) && 'pattern-primary',
+            move?.secondary?.some(entry => entry.cell === cell) && 'pattern-secondary',
+            move?.fins?.some(entry => entry.cell === cell) && 'pattern-fin',
             changes.some(change => change.cell === cell) && 'deduction'].filter(Boolean).join(' ');
         }
         board.append(tile);

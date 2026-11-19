@@ -4,7 +4,16 @@ import { TECHS, SOLVE_ORDER } from './vendor/engine/ratings';
 import type { CellDigit } from './vendor/engine/steps';
 
 export type Clues = (number | null)[]; // rows first, then columns; null is not zero
-export interface Move { name: string; score: number; description: string; placements: CellDigit[]; eliminations: CellDigit[] }
+export interface Move {
+  name: string;
+  score: number;
+  description: string;
+  placements: CellDigit[];
+  eliminations: CellDigit[];
+  primary?: CellDigit[];
+  secondary?: CellDigit[];
+  fins?: CellDigit[];
+}
 export const RING = Array.from({length:81},(_,i)=>i).filter(i=>{const r=Math.floor(i/9),c=i%9;return r>=2&&r<=6&&c>=2&&c<=6&&(r===2||r===6||c===2||c===6)});
 export const CORNERS = Array.from({length:81},(_,i)=>i).filter(i=>{const r=Math.floor(i/9),c=i%9;return (r<2||r>6)&&(c<2||c>6)});
 export function sandwichSum(line: number[]): number {
@@ -123,7 +132,7 @@ export function sandwichMove(g:Grid,clues:Clues):Move|null {
     if(!support)throw new Error(`${u<9?'Row':'Column'} ${u%9+1} cannot satisfy its sandwich clue.`);
     const eliminations:CellDigit[]=[];
     UNITS[u].forEach((cell,j)=>{if(!g.values[cell])for(const digit of digitsOf(g.cands[cell]&~support[j]))eliminations.push({cell,digit})});
-    if(eliminations.length)return {name:'Sandwich sum',score:0,description:`${u<9?'Row':'Column'} ${u%9+1}: every valid arrangement sums to ${clues[u]} between 1 and 9. Remove candidates absent from all those arrangements.`,placements:[],eliminations};
+    if(eliminations.length)return {primary: UNITS[u].flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:'Sandwich sum',score:0,description:`${u<9?'Row':'Column'} ${u%9+1}: every valid arrangement sums to ${clues[u]} between 1 and 9. Remove candidates absent from all those arrangements.`,placements:[],eliminations};
   }return null;
 }
 /** Conservative per-digit bounds on equal multisets, in both directions. */
@@ -139,7 +148,7 @@ export function ringMove(g:Grid):Move|null {
       if(side.fixed===hi)side.possible.forEach(cell=>eliminations.push({cell,digit}));
       else if(side.fixed+side.possible.length===lo)side.possible.forEach(cell=>placements.push({cell,digit}));
     }
-    if(placements.length||eliminations.length)return {name:'Phistomefel Ring',score:200,description:`The ring and corners contain the same number of ${digit}s. Their shared count is between ${lo} and ${hi}; a saturated count removes candidates, and a required count forces the remaining positions.`,placements,eliminations};
+    if(placements.length||eliminations.length)return {primary: RING.flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))), secondary: CORNERS.flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:'Phistomefel Ring',score:200,description:`The ring and corners contain the same number of ${digit}s. Their shared count is between ${lo} and ${hi}; a saturated count removes candidates, and a required count forces the remaining positions.`,placements,eliminations};
   }return null;
 }
 export const SAFE_ORDER=SOLVE_ORDER.filter(t=>TECHS[t].category!=='Uniqueness');
