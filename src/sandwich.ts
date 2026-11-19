@@ -13,6 +13,8 @@ export interface Move {
   primary?: CellDigit[];
   secondary?: CellDigit[];
   fins?: CellDigit[];
+  /** Row 0–8 or column 9–17 whose outside sum drives this deduction. */
+  sandwichUnit?: number;
 }
 export const RING = Array.from({length:81},(_,i)=>i).filter(i=>{const r=Math.floor(i/9),c=i%9;return r>=2&&r<=6&&c>=2&&c<=6&&(r===2||r===6||c===2||c===6)});
 export const CORNERS = Array.from({length:81},(_,i)=>i).filter(i=>{const r=Math.floor(i/9),c=i%9;return (r<2||r>6)&&(c<2||c>6)});
@@ -132,7 +134,7 @@ export function sandwichMove(g:Grid,clues:Clues):Move|null {
     if(!support)throw new Error(`${u<9?'Row':'Column'} ${u%9+1} cannot satisfy its sandwich clue.`);
     const eliminations:CellDigit[]=[];
     UNITS[u].forEach((cell,j)=>{if(!g.values[cell])for(const digit of digitsOf(g.cands[cell]&~support[j]))eliminations.push({cell,digit})});
-    if(eliminations.length)return {primary: UNITS[u].flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:'Sandwich sum',score:0,description:`${u<9?'Row':'Column'} ${u%9+1}: every valid arrangement sums to ${clues[u]} between 1 and 9. Remove candidates absent from all those arrangements.`,placements:[],eliminations};
+    if(eliminations.length)return {sandwichUnit: u, primary: UNITS[u].flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:'Sandwich sum',score:0,description:`${u<9?'Row':'Column'} ${u%9+1}: every valid arrangement sums to ${clues[u]} between 1 and 9. Remove candidates absent from all those arrangements.`,placements:[],eliminations};
   }return null;
 }
 /** Conservative per-digit bounds on equal multisets, in both directions. */

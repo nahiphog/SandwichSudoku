@@ -24,6 +24,11 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
         const tile = document.createElement('span');
         if (r < 0 || c < 0) {
           tile.textContent = r < 0 && c < 0 ? '' : String(clues[r < 0 ? 9 + c : r] ?? '');
+          const unit = r < 0 ? 9 + c : r;
+          if (!(r < 0 && c < 0) && move?.sandwichUnit === unit) {
+            tile.className = 'walkthrough-driving-clue';
+            tile.setAttribute('aria-label', `${unit < 9 ? 'Row' : 'Column'} ${unit % 9 + 1} sum ${clues[unit]}, driving this deduction`);
+          }
         } else {
           const cell = r * 9 + c;
           if (grid.values[cell]) {
@@ -58,6 +63,7 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
             move?.primary?.some(entry => entry.cell === cell) && 'pattern-primary',
             move?.secondary?.some(entry => entry.cell === cell) && 'pattern-secondary',
             move?.fins?.some(entry => entry.cell === cell) && 'pattern-fin',
+            (move?.sandwichUnit === r || move?.sandwichUnit === 9 + c) && 'walkthrough-driving-unit',
             changes.some(change => change.cell === cell) && 'deduction'].filter(Boolean).join(' ');
         }
         board.append(tile);
