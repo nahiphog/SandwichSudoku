@@ -1,3 +1,4 @@
+import {pickDigGiven} from './digging';
 import { type Grid, UNITS, bit, digitsOf, cloneGrid, gridFromValues, isBroken, isSolved, setValue } from './vendor/engine/board';
 import { findNextStep, applyStep } from './vendor/engine/humanSolver';
 import { TECHS } from './vendor/engine/ratings';
@@ -66,7 +67,7 @@ function digPuzzle(logicalOnly: boolean, rotational: boolean, digClues: boolean 
   const solution = generate();
   const clues = cluesFor(solution.values, clueType);
   const values = Array.from(solution.values);
-  const groups = rotational
+  const digitGroups = rotational
     ? Array.from({length: 40}, (_, cell) => [cell, 80 - cell])
     : Array.from(values.keys(), cell => [cell]);
   progress?.(values, clues, "start");
@@ -83,31 +84,38 @@ function digPuzzle(logicalOnly: boolean, rotational: boolean, digClues: boolean 
     }
     return true;
   }
-  for (const group of shuffle(groups)) {
-    for (const cell of group) values[cell] = 0;
-    if (!canRemove(gridFromValues(values))) {
-      for (const cell of group) values[cell] = solution.values[cell];
+  const outsideEnabled = Boolean(digClues && digClues !== 'none');
+  const clueGroups = !outsideEnabled ? [] : digClues === 'pairs'
+    ? Array.from({length: clues.length / 9}, (_, side) =>
+        [0, 1, 2, 3].map(offset => [side * 9 + offset, side * 9 + 8 - offset])).flat()
+    : Array.from(clues.keys(), index => [index]);
+  const groups = [
+    ...digitGroups.map(indices => ({kind: 'digits' as const, indices})),
+    ...clueGroups.map(indices => ({kind: 'clues' as const, indices})),
+  ];
+  const pending = new Set(groups);
+  const byEntry = new Map(groups.flatMap(group => group.indices.map(index =>
+    [group.kind + ':' + index, group] as const)));
+  // Draw from current givens, including retained/protected ones. Skipping a
+  // previously tested group preserves the requested per-given probabilities
+  // without repeating expensive checks. Stop once every allowed group was tried.
+  while (pending.size) {
+    const selected = pickDigGiven(values, clues, outsideEnabled)!;
+    const group = byEntry.get(selected.kind + ':' + selected.index);
+    if (!group || !pending.delete(group)) continue;
+    if (group.kind === 'digits') {
+      for (const cell of group.indices) values[cell] = 0;
+      if (canRemove(gridFromValues(values))) progress?.(values, clues, 'digits');
+      else for (const cell of group.indices) values[cell] = solution.values[cell];
     } else {
-      progress?.(values, clues, "digits");
+      if (clues.filter(clue => clue !== null).length - group.indices.length < 1) continue;
+      const originals = group.indices.map(index => clues[index]);
+      for (const index of group.indices) clues[index] = null;
+      if (canRemove(gridFromValues(values))) progress?.(values, clues, 'clues');
+      else group.indices.forEach((index, offset) => { clues[index] = originals[offset]; });
     }
   }
   const grid = gridFromValues(values);
-  if (digClues && digClues !== 'none') {
-    let remaining = clues.length;
-    const groups = digClues === 'pairs'
-      ? Array.from({length: clues.length / 9}, (_, side) =>
-          [0, 1, 2, 3].map(offset => [side * 9 + offset, side * 9 + 8 - offset])).flat()
-      : Array.from(clues.keys(), index => [index]);
-    for (const group of shuffle(groups)) {
-      if (remaining - group.length < 1) continue;
-      const originals = group.map(index => clues[index]);
-      for (const index of group) clues[index] = null;
-      if (canRemove(grid)) {
-        remaining -= group.length;
-        progress?.(values, clues, "clues");
-      } else group.forEach((index, offset) => { clues[index] = originals[offset]; });
-    }
-  }
   return {grid, clues, fullyDug, rating, solution: solution.values};
 }
 

@@ -17,9 +17,11 @@ it.each(['sandwich', 'edge-difference', 'skyscraper', 'x-sums', 'sum-before-nine
   let starts = 0;
   let digits = 0;
   let outside = 0;
+  const removalOrder: string[] = [];
   const result = generatePuzzle(true, true, 'single', (values, clues, phase) => {
     if (phase === 'start') starts++;
     if (phase !== 'digits' && phase !== 'clues') return;
+    removalOrder.push(phase);
     if (phase === 'digits') digits++;
     else outside++;
     const grid = gridFromValues(values);
@@ -31,6 +33,7 @@ it.each(['sandwich', 'edge-difference', 'skyscraper', 'x-sums', 'sum-before-nine
   expect(starts).toBe(1);
   expect(digits).toBeGreaterThan(0);
   expect(outside).toBeGreaterThan(0);
+  expect(removalOrder.indexOf('clues')).toBeLessThan(removalOrder.lastIndexOf('digits'));
   expect(result.rating).toEqual(rateLogicalPuzzle(result.grid, result.clues, clueType));
   expect(result.rating!.moves.every(move => move.score <= 200)).toBe(true);
   const allowedNames = [...DISPLAYED_TECHNIQUES.map(id => TECHS[id].name), 'Sandwich sum', 'Edge difference', 'Skyscraper', 'X-sums', 'Sum before nine', 'Phistomefel Ring'];
