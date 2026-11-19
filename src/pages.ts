@@ -56,7 +56,7 @@ export function mountPages() {
   simulation.className = 'card simulation';
   simulation.innerHTML = `<h1>Simulation</h1>
     <p>Generate sample grids, remove random digits, and check whether each puzzle has a unique solution.</p>
-    <form><fieldset class="clue-switch"><legend>Choose your puzzle type</legend><div class="clue-options"><label><input type="radio" name="clueType" value="sandwich" checked><span>Sandwich sums</span></label><label><input type="radio" name="clueType" value="edge-difference"><span>Edge difference</span></label><label><input type="radio" name="clueType" value="skyscraper"><span>Skyscraper</span></label><label><input type="radio" name="clueType" value="x-sums"><span>X-sums</span></label><label><input type="radio" name="clueType" value="sum-before-nine"><span>Sum before nine</span></label></div></fieldset><label>Samples <input name="samples" type="number" min="1" max="100" value="10" required></label>
+    <form><fieldset class="clue-switch"><legend>Choose your puzzle type</legend><select name="clueType" aria-label="Choose your puzzle type"><option value="sandwich">Sandwich sums</option><option value="edge-difference">Edge difference</option><option value="skyscraper">Skyscraper</option><option value="x-sums">X-sums</option><option value="sum-before-nine">Sum before nine</option></select></fieldset><label>Samples <input name="samples" type="number" min="1" max="100" value="10" required></label>
     <label>Digits to remove <input name="removed" type="number" min="0" max="81" value="35" required></label>
     <button class="primary">Run simulation</button><button type="button" hidden>Cancel</button></form>
     <p role="status"></p><button id="simulation-export" hidden>Download results CSV</button>
