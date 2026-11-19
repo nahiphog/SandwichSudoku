@@ -40,7 +40,7 @@ export function generate(): Grid {
 /** Keep each removal only when exact search proves the remaining puzzle unique. */
 export type SumDigMode = "none" | "single" | "pairs";
 type DigProgress = (values: number[], clues: Clues, phase: "start" | "digits" | "clues" | "rating") => void;
-function digPuzzle(rotational: boolean, digClues: boolean | SumDigMode, progress?: DigProgress, clueType: ClueType = 'sandwich') {
+function digPuzzle(logicalOnly: boolean, rotational: boolean, digClues: boolean | SumDigMode, progress?: DigProgress, clueType: ClueType = 'sandwich') {
   const solution = generate();
   const clues = cluesFor(solution.values, clueType);
   const values = Array.from(solution.values);
@@ -49,11 +49,21 @@ function digPuzzle(rotational: boolean, digClues: boolean | SumDigMode, progress
     : Array.from(values.keys(), cell => [cell]);
   progress?.(values, clues, "start");
   let fullyDug = true;
+  let rating = logicalOnly ? rateLogicalPuzzle(solution, clues, clueType) : null;
+  function canRemove(candidate: Grid): boolean {
+    const check = solveExact(candidate, clues, 250, clueType);
+    if (check.exhausted) fullyDug = false;
+    if (check.exhausted || check.solutions.length !== 1) return false;
+    if (logicalOnly) {
+      const candidateRating = rateLogicalPuzzle(candidate, clues, clueType);
+      if (!candidateRating) return false;
+      rating = candidateRating;
+    }
+    return true;
+  }
   for (const group of shuffle(groups)) {
     for (const cell of group) values[cell] = 0;
-    const check = solveExact(gridFromValues(values), clues, 250, clueType);
-    if (check.exhausted) fullyDug = false;
-    if (check.exhausted || check.solutions.length !== 1) {
+    if (!canRemove(gridFromValues(values))) {
       for (const cell of group) values[cell] = solution.values[cell];
     } else {
       progress?.(values, clues, "digits");
@@ -70,15 +80,13 @@ function digPuzzle(rotational: boolean, digClues: boolean | SumDigMode, progress
       if (remaining - group.length < 1) continue;
       const originals = group.map(index => clues[index]);
       for (const index of group) clues[index] = null;
-      const check = solveExact(grid, clues, 250, clueType);
-      if (check.exhausted) fullyDug = false;
-      if (!check.exhausted && check.solutions.length === 1) {
+      if (canRemove(grid)) {
         remaining -= group.length;
         progress?.(values, clues, "clues");
       } else group.forEach((index, offset) => { clues[index] = originals[offset]; });
     }
   }
-  return {grid, clues, fullyDug, solution: solution.values};
+  return {grid, clues, fullyDug, rating, solution: solution.values};
 }
 
 export function rateLogicalPuzzle(input: Grid, clues: Clues, clueType: ClueType = 'sandwich') {
@@ -102,13 +110,10 @@ export function rateLogicalPuzzle(input: Grid, clues: Clues, clueType: ClueType 
 }
 
 export function generatePuzzle(logicalOnly = false, rotational = true, digClues: boolean | SumDigMode = false, progress?: DigProgress, clueType: ClueType = 'sandwich') {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const puzzle = digPuzzle(rotational, digClues, progress, clueType);
-    progress?.(Array.from(puzzle.grid.values), puzzle.clues, "rating");
-    const rating = rateLogicalPuzzle(puzzle.grid, puzzle.clues, clueType);
-    if (!logicalOnly || rating) return {...puzzle, rating, solution: rating ? null : puzzle.solution};
-  }
-  throw new Error('No puzzle with a complete logical solve was found. Try generating again.');
+  const puzzle = digPuzzle(logicalOnly, rotational, digClues, progress, clueType);
+  progress?.(Array.from(puzzle.grid.values), puzzle.clues, "rating");
+  const rating = puzzle.rating ?? rateLogicalPuzzle(puzzle.grid, puzzle.clues, clueType);
+  return {...puzzle, rating, solution: rating ? null : puzzle.solution};
 }
 
 /** All compatible permutations of a line; union their candidates for sound eliminations. */

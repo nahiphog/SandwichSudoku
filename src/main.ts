@@ -143,7 +143,7 @@ el('generate-puzzle').onclick = () => {
       report.append(table);
     }
     status(data.result.fullyDug
-      ? 'Fully dug with exactly one solution. Every remaining removal allowed by your settings would break uniqueness.'
+      ? 'Fully dug with exactly one solution under your selected settings. No further allowed removal passed the required checks.'
       : 'Exactly one solution. Full digging could not be verified because some removal checks reached the search limit.');
   };
   worker.onerror = () => {

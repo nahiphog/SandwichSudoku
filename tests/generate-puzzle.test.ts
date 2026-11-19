@@ -8,7 +8,29 @@ beforeEach(() => {
   });
 });
 afterEach(() => vi.restoreAllMocks());
-import { cluesFor, generatePuzzle, solveExact } from '../src/sandwich';
+import { cluesFor, generatePuzzle, rateLogicalPuzzle, solveExact } from '../src/sandwich';
+import { gridFromValues } from '../src/vendor/engine/board';
+
+it.each(['sandwich', 'edge-difference'] as const)('preserves a logical solve after every removal without restarting (%s)', clueType => {
+  let starts = 0;
+  let digits = 0;
+  let outside = 0;
+  const result = generatePuzzle(true, true, 'single', (values, clues, phase) => {
+    if (phase === 'start') starts++;
+    if (phase !== 'digits' && phase !== 'clues') return;
+    if (phase === 'digits') digits++;
+    else outside++;
+    const grid = gridFromValues(values);
+    expect(rateLogicalPuzzle(grid, clues, clueType)).not.toBeNull();
+    const exact = solveExact(grid, clues, 100000, clueType);
+    expect(exact.exhausted).toBe(false);
+    expect(exact.solutions).toHaveLength(1);
+  }, clueType);
+  expect(starts).toBe(1);
+  expect(digits).toBeGreaterThan(0);
+  expect(outside).toBeGreaterThan(0);
+  expect(result.rating).toEqual(rateLogicalPuzzle(result.grid, result.clues, clueType));
+}, 60000);
 
 it('generates a unique logical edge difference puzzle with paired clue digging', () => {
   const {grid, clues, rating} = generatePuzzle(true, true, 'pairs', undefined, 'edge-difference');
