@@ -28,7 +28,29 @@ Edge clues range from 1 to 8. Generation, custom builds, hints, exact solving,
 walkthroughs, and copied puzzles use the selected rule. Simulation has its own
 clue type selector. Switching types clears the old clues and resets candidates;
 Undo restores the previous puzzle. JSON stores `clueType` as `sandwich` or
-`edge-difference`; older JSON without this field defaults to sandwich sums.
+`edge-difference`, `skyscraper`, `x-sums`, or `sum-before-nine`; older JSON without this field defaults to sandwich sums.
+
+Choose **Skyscraper** to treat each digit as a building of that height. An outside
+clue counts buildings visible from its direction; taller buildings hide shorter
+ones. Independent clues from 1 to 9 can appear on all four sides. Skyscraper JSON
+stores 36 clues: nine left row clues, nine top column clues, nine right row clues,
+then nine bottom column clues. Rows are ordered top to bottom and columns left
+to right; use `null` for an absent clue. Paired clue digging uses positions
+opposite each other under a 180-degree rotation.
+
+Choose **X-sums** to sum the first X digits viewed from a clue, where the first
+digit gives X and is included in the sum. For example, a top clue of 20 with
+3 in the first cell sums the first three cells to 20. Clues range from 1 to 45
+and can appear on all four sides. JSON uses `clueType: "x-sums"` and the same
+36-position ordering as Skyscraper. Generation, custom builds, simulation,
+hints, solving, walkthroughs, and text/image exports all support X-sums.
+
+Choose **Sum before nine** to sum every digit before the 9 viewed from a clue,
+excluding the 9. A clue of 6 can begin with 249, 1329, or 69. Clues range from
+0 to 36: zero places 9 first, while 36 places 9 last. All four sides are
+supported throughout generation, custom builds, simulation, solving, and exports.
+JSON uses `clueType: "sum-before-nine"` with the same 36-position ordering as
+Skyscraper and X-sums; `null` means absent and is distinct from zero.
 
 Find next step previews a deduction; Apply this step records its explanation and
 score. Candidate eliminations persist until the construction is edited. Undo

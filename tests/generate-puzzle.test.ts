@@ -13,7 +13,7 @@ import { gridFromValues } from '../src/vendor/engine/board';
 import {DISPLAYED_TECHNIQUES} from '../src/techniques';
 import {TECHS} from '../src/vendor/engine/ratings';
 
-it.each(['sandwich', 'edge-difference'] as const)('preserves a logical solve after every removal without restarting (%s)', clueType => {
+it.each(['sandwich', 'edge-difference', 'skyscraper', 'x-sums', 'sum-before-nine'] as const)('preserves a logical solve after every removal without restarting (%s)', clueType => {
   let starts = 0;
   let digits = 0;
   let outside = 0;
@@ -33,7 +33,7 @@ it.each(['sandwich', 'edge-difference'] as const)('preserves a logical solve aft
   expect(outside).toBeGreaterThan(0);
   expect(result.rating).toEqual(rateLogicalPuzzle(result.grid, result.clues, clueType));
   expect(result.rating!.moves.every(move => move.score <= 200)).toBe(true);
-  const allowedNames = [...DISPLAYED_TECHNIQUES.map(id => TECHS[id].name), 'Sandwich sum', 'Edge difference', 'Phistomefel Ring'];
+  const allowedNames = [...DISPLAYED_TECHNIQUES.map(id => TECHS[id].name), 'Sandwich sum', 'Edge difference', 'Skyscraper', 'X-sums', 'Sum before nine', 'Phistomefel Ring'];
   for (const move of result.rating!.moves) expect(allowedNames).toContain(move.name);
 }, 60000);
 
@@ -92,4 +92,17 @@ it('removes outside clues in matching row and column pairs', () => {
     expect(clues[index] === null).toBe(clues[8 - index] === null);
     expect(clues[9 + index] === null).toBe(clues[17 - index] === null);
   }
+}, 60000);
+
+it.each(['skyscraper', 'x-sums', 'sum-before-nine'] as const)('digs %s clues in rotationally opposite pairs', clueType => {
+  const {grid, clues, rating} = generatePuzzle(true, true, 'pairs', undefined, clueType);
+  expect(clues).toHaveLength(36);
+  expect(rating).not.toBeNull();
+  expect(clues).toContain(null);
+  for (let i = 0; i < 18; i++) {
+    expect(clues[i] === null).toBe(clues[18 + Math.floor(i / 9) * 9 + 8 - i % 9] === null);
+  }
+  const result = solveExact(grid, clues, 100000, clueType);
+  expect(result.exhausted).toBe(false);
+  expect(result.solutions).toHaveLength(1);
 }, 60000);

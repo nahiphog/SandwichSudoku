@@ -4,8 +4,8 @@ import { TECHS } from './vendor/engine/ratings';
 import { LOGICAL_ORDER } from './techniques';
 import type { CellDigit } from './vendor/engine/steps';
 
-export type ClueType = "sandwich" | "edge-difference";
-export type Clues = (number | null)[]; // rows first, then columns; null is not zero
+export type ClueType = "sandwich" | "edge-difference" | "skyscraper" | "x-sums" | "sum-before-nine";
+export type Clues = (number | null)[]; // Left rows, top columns; Four-sided variants add right rows, bottom columns.
 export interface Move {
   name: string;
   score: number;
@@ -15,7 +15,7 @@ export interface Move {
   primary?: CellDigit[];
   secondary?: CellDigit[];
   fins?: CellDigit[];
-  /** Row 0–8 or column 9–17 whose outside clue drives this deduction. */
+  /** Outside clue index: left 0–8, top 9–17, right 18–26, bottom 27–35. */
   sandwichUnit?: number;
 }
 export const RING = Array.from({length:81},(_,i)=>i).filter(i=>{const r=Math.floor(i/9),c=i%9;return r>=2&&r<=6&&c>=2&&c<=6&&(r===2||r===6||c===2||c===6)});
@@ -26,7 +26,28 @@ export function sandwichSum(line: number[]): number {
   return line.slice(Math.min(a,b)+1,Math.max(a,b)).reduce((s,d)=>s+d,0);
 }
 export const edgeDifference = (line: number[]): number => Math.abs(line[0] - line[8]);
-export const cluesFor = (values: ArrayLike<number>, clueType: ClueType = 'sandwich'): Clues => UNITS.slice(0,18).map(u=>(clueType === 'edge-difference' ? edgeDifference : sandwichSum)(u.map(i=>values[i])));
+export const fourSided = (type: ClueType): boolean => type === 'skyscraper' || type === 'x-sums' || type === 'sum-before-nine';
+export const clueCount = (type: ClueType): number => fourSided(type) ? 36 : 18;
+export const clueMin = (type: ClueType): number => type === 'sandwich' || type === 'sum-before-nine' ? 0 : 1;
+export const clueMax = (type: ClueType): number => ({sandwich: 35, 'edge-difference': 8, skyscraper: 9, 'x-sums': 45, 'sum-before-nine': 36})[type];
+export const clueLabel = (type: ClueType): string => type === 'sum-before-nine' ? 'PRE-9' : type === 'x-sums' ? 'X-SUM' : type === 'sandwich' ? 'SUM' : type === 'skyscraper' ? 'VIEW' : 'DIFF';
+export const clueName = (type: ClueType): string => type === 'sum-before-nine' ? 'Sum before nine' : type === 'x-sums' ? 'X-sums' : type === 'sandwich' ? 'Sandwich sum' : type === 'skyscraper' ? 'Skyscraper' : 'Edge difference';
+export const clueCells = (index: number): number[] => index < 18 ? UNITS[index] : [...UNITS[index - 18]].reverse();
+export const cluePosition = (index: number): string => `${index % 18 < 9 ? 'Row' : 'Column'} ${index % 9 + 1} (${['left', 'top', 'right', 'bottom'][Math.floor(index / 9)]})`;
+export function visibleBuildings(line: number[]): number {
+  let tallest = 0, visible = 0;
+  for (const height of line) if (height > tallest) { tallest = height; visible++; }
+  return visible;
+}
+export const xSum = (line: number[]): number => line.slice(0, line[0]).reduce((sum, digit) => sum + digit, 0);
+export function sumBeforeNine(line: number[]): number {
+  const end = line.indexOf(9);
+  if (end < 0) throw new Error('A complete line needs 9.');
+  return line.slice(0, end).reduce((sum, digit) => sum + digit, 0);
+}
+export const cluesFor = (values: ArrayLike<number>, clueType: ClueType = 'sandwich'): Clues =>
+  Array.from({length: clueCount(clueType)}, (_, index) =>
+    (clueType === 'sum-before-nine' ? sumBeforeNine : clueType === 'x-sums' ? xSum : clueType === 'skyscraper' ? visibleBuildings : clueType === 'edge-difference' ? edgeDifference : sandwichSum)(clueCells(index).map(i => values[i])));
 const shuffle = <T>(a:T[]):T[] => {for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 /** Randomized backtracking, so generation is not limited to one base-grid pattern. */
 export function generate(): Grid {
@@ -74,8 +95,9 @@ function digPuzzle(logicalOnly: boolean, rotational: boolean, digClues: boolean 
   if (digClues && digClues !== 'none') {
     let remaining = clues.length;
     const groups = digClues === 'pairs'
-      ? [0, 1, 2, 3, 9, 10, 11, 12].map(index =>
-          [index, index < 9 ? 8 - index : 26 - index])
+      ? (fourSided(clueType)
+          ? Array.from({length: 18}, (_, index) => [index, 18 + Math.floor(index / 9) * 9 + 8 - index % 9])
+          : [0, 1, 2, 3, 9, 10, 11, 12].map(index => [index, index < 9 ? 8 - index : 26 - index]))
       : Array.from(clues.keys(), index => [index]);
     for (const group of shuffle(groups)) {
       if (remaining - group.length < 1) continue;
@@ -120,6 +142,9 @@ export function generatePuzzle(logicalOnly = false, rotational = true, digClues:
 /** All compatible permutations of a line; union their candidates for sound eliminations. */
 export function lineSupport(g:Grid, cells:number[], clue:number, clueType: ClueType = 'sandwich'):number[]|null {
   if (clueType === 'edge-difference') return edgeSupport(g, cells, clue);
+  if (clueType === 'skyscraper') return skyscraperSupport(g, cells, clue);
+  if (clueType === 'x-sums') return xSumSupport(g, cells, clue);
+  if (clueType === 'sum-before-nine') return sumBeforeNineSupport(g, cells, clue);
   const support=new Array<number>(9).fill(0), line=new Array<number>(9).fill(0);
   let count=0;
   const visit=(p:number,used:number,phase:number,sum:number):void=>{
@@ -160,14 +185,87 @@ function edgeSupport(g: Grid, cells: number[], clue: number): number[] | null {
   }
   return visit(0, 0, 0) ? support : null;
 }
+/** Union of candidates across all compatible visible-building permutations. */
+function skyscraperSupport(g: Grid, cells: number[], clue: number): number[] | null {
+  if (!Number.isInteger(clue) || clue < 1 || clue > 9) return null;
+  const masks = cells.map(cell => g.values[cell] ? bit(g.values[cell]) : g.cands[cell]);
+  const support = new Array<number>(9).fill(0);
+  const memo = new Map<number, boolean>();
+  function visit(p: number, used: number, tallest: number, visible: number): boolean {
+    if (visible > clue || visible + 9 - tallest < clue) return false;
+    if (p === 9) return visible === clue;
+    const key = used * 100 + tallest * 10 + visible;
+    if (memo.has(key)) return memo.get(key)!;
+    let valid = false;
+    for (const digit of digitsOf(masks[p] & ~used)) {
+      if (visit(p + 1, used | bit(digit), Math.max(tallest, digit), visible + Number(digit > tallest))) {
+        support[p] |= bit(digit);
+        valid = true;
+      }
+    }
+    memo.set(key, valid);
+    return valid;
+  }
+  return visit(0, 0, 0, 0) ? support : null;
+}
+/** The first digit sets the prefix length; the rest of the line must still be completable. */
+function xSumSupport(g: Grid, cells: number[], clue: number): number[] | null {
+  if (!Number.isInteger(clue) || clue < 1 || clue > 45) return null;
+  const masks = cells.map(cell => g.values[cell] ? bit(g.values[cell]) : g.cands[cell]);
+  const support = new Array<number>(9).fill(0);
+  const memo = new Map<number, boolean>();
+  function visit(p: number, used: number, first: number, sum: number): boolean {
+    if (sum > clue || (p > 0 && p >= first && sum !== clue)) return false;
+    if (p === 9) return true;
+    // Position follows from the used digits; first and sum describe the prefix constraint.
+    const key = (first * 46 + sum) * 1024 + used;
+    if (memo.has(key)) return memo.get(key)!;
+    let valid = false;
+    for (const digit of digitsOf(masks[p] & ~used)) {
+      const length = p === 0 ? digit : first;
+      if (visit(p + 1, used | bit(digit), length, sum + (p < length ? digit : 0))) {
+        support[p] |= bit(digit);
+        valid = true;
+      }
+    }
+    memo.set(key, valid);
+    return valid;
+  }
+  return visit(0, 0, 0, 0) ? support : null;
+}
+/** Stop summing at 9, while enforcing distinct digits throughout the entire line. */
+function sumBeforeNineSupport(g: Grid, cells: number[], clue: number): number[] | null {
+  if (!Number.isInteger(clue) || clue < 0 || clue > 36) return null;
+  const masks = cells.map(cell => g.values[cell] ? bit(g.values[cell]) : g.cands[cell]);
+  const support = new Array<number>(9).fill(0);
+  const memo = new Map<number, boolean>();
+  function visit(p: number, used: number, sum: number): boolean {
+    const passedNine = Boolean(used & bit(9));
+    if (sum > clue || (passedNine && sum !== clue)) return false;
+    if (p === 9) return sum === clue;
+    // The used-digit mask also determines position and whether 9 has been passed.
+    const key = sum * 1024 + used;
+    if (memo.has(key)) return memo.get(key)!;
+    let valid = false;
+    for (const digit of digitsOf(masks[p] & ~used)) {
+      if (visit(p + 1, used | bit(digit), sum + (!passedNine && digit !== 9 ? digit : 0))) {
+        support[p] |= bit(digit);
+        valid = true;
+      }
+    }
+    memo.set(key, valid);
+    return valid;
+  }
+  return visit(0, 0, 0) ? support : null;
+}
 export function sandwichMove(g:Grid,clues:Clues, clueType: ClueType = 'sandwich'):Move|null {
-  for(let u=0;u<18;u++){
-    if(clues[u]===null)continue;
-    const support=lineSupport(g,UNITS[u],clues[u]!,clueType);
-    if(!support)throw new Error(`${u<9?'Row':'Column'} ${u%9+1} cannot satisfy its ${clueType === 'sandwich' ? 'sandwich sum' : 'edge difference'} clue.`);
+  for(let u=0;u<clueCount(clueType);u++){
+    if(clues[u]==null)continue;
+    const support=lineSupport(g,clueCells(u),clues[u]!,clueType);
+    if(!support)throw new Error(`${cluePosition(u)} cannot satisfy its ${clueName(clueType)} clue.`);
     const eliminations:CellDigit[]=[];
-    UNITS[u].forEach((cell,j)=>{if(!g.values[cell])for(const digit of digitsOf(g.cands[cell]&~support[j]))eliminations.push({cell,digit})});
-    if(eliminations.length)return {sandwichUnit: u, primary: UNITS[u].flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:clueType === 'sandwich' ? 'Sandwich sum' : 'Edge difference',score:5,description:`${u<9?'Row':'Column'} ${u%9+1}: ${clueType === 'sandwich' ? `every valid arrangement sums to ${clues[u]} between 1 and 9` : `every valid arrangement has an absolute difference of ${clues[u]} between the two end cells`}. Remove candidates absent from all those arrangements.`,placements:[],eliminations};
+    clueCells(u).forEach((cell,j)=>{if(!g.values[cell])for(const digit of digitsOf(g.cands[cell]&~support[j]))eliminations.push({cell,digit})});
+    if(eliminations.length)return {sandwichUnit: u, primary: clueCells(u).flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:clueName(clueType),score:5,description:`${cluePosition(u)}: ${clueType === 'sandwich' ? `every valid arrangement sums to ${clues[u]} between 1 and 9` : clueType === 'sum-before-nine' ? `the digits before 9 sum to ${clues[u]} when viewed from this direction, excluding the 9` : clueType === 'x-sums' ? `the first X digits sum to ${clues[u]}, where X is the first digit viewed from this direction` : clueType === 'skyscraper' ? `every valid arrangement shows ${clues[u]} buildings from this direction` : `every valid arrangement has an absolute difference of ${clues[u]} between the two end cells`}. Remove candidates absent from all those arrangements.`,placements:[],eliminations};
   }return null;
 }
 /** Conservative per-digit bounds on equal multisets, in both directions. */
@@ -204,7 +302,7 @@ export function applyMove(g:Grid,m:Move):void {
 export function validate(g:Grid,clues:Clues, clueType: ClueType = 'sandwich'):void {
   for(const unit of UNITS){const values=unit.map(c=>g.values[c]).filter(Boolean);if(new Set(values).size!==values.length)throw new Error('Duplicate digits in a row, column, or box.');}
   if(isBroken(g))throw new Error('An empty cell has no possible value.');
-  for(let u=0;u<18;u++)if(clues[u]!==null&&!lineSupport(g,UNITS[u],clues[u]!,clueType))throw new Error(`${u<9?'Row':'Column'} ${u%9+1} conflicts with its clue.`);
+  for(let u=0;u<clueCount(clueType);u++)if(clues[u]!=null&&!lineSupport(g,clueCells(u),clues[u]!,clueType))throw new Error(`${cluePosition(u)} conflicts with its clue.`);
 }
 /** Exact variant search, capped and explicit about inconclusive searches. */
 export function solveExact(start:Grid, clues:Clues, budget=100000, clueType: ClueType = 'sandwich'):{solutions:Grid[]; exhausted:boolean} {

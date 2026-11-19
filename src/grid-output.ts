@@ -1,10 +1,11 @@
-import {applyMove, RING, CORNERS, type Clues, type Move, type ClueType} from './sandwich';
+import {fourSided, clueLabel, clueName, cluePosition, applyMove, RING, CORNERS, type Clues, type Move, type ClueType} from './sandwich';
 import {bit, cellName, cloneGrid, digitsOf, type Grid} from './vendor/engine/board';
 
 export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues, moves: Move[], solution?: Uint8Array, clueType: ClueType = 'sandwich') {
   panel.innerHTML = '<h2>Solution walkthrough</h2><p aria-live="polite"></p><small>Teal marks the pattern, amber marks supporting candidates, purple marks fins. Red struck-through candidates are eliminated in this step.</small><div class="walkthrough-grid" aria-label="Walkthrough grid"></div><div class="walkthrough-nav"><button>Previous</button><button>Next</button><button>Show solution</button></div>';
   const description = panel.querySelector('p')!;
   const board = panel.querySelector('.walkthrough-grid')!;
+  board.classList.toggle('four-sided-grid', fourSided(clueType));
   const ringCounts = document.createElement('div');
   ringCounts.className = 'walkthrough-ring-counts';
   board.after(ringCounts);
@@ -47,15 +48,16 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
       : step ? 'Exact search completed the grid.'
       : solution ? 'The logical solver stalled. Show solution to see the verified completion.' : `Starting grid · ${end} steps`;
     board.replaceChildren();
-    for (let r = -1; r < 9; r++) {
-      for (let c = -1; c < 9; c++) {
+    for (let r = -1; r < (fourSided(clueType) ? 10 : 9); r++) {
+      for (let c = -1; c < (fourSided(clueType) ? 10 : 9); c++) {
         const tile = document.createElement('span');
-        if (r < 0 || c < 0) {
-          tile.textContent = r < 0 && c < 0 ? (clueType === 'sandwich' ? 'SUM' : 'DIFF') : String(clues[r < 0 ? 9 + c : r] ?? '');
-          const unit = r < 0 ? 9 + c : r;
-          if (!(r < 0 && c < 0) && move?.sandwichUnit === unit) {
+        if (r < 0 || c < 0 || r === 9 || c === 9) {
+          const corner = (r < 0 || r === 9) && (c < 0 || c === 9);
+          const unit = r < 0 ? 9 + c : r === 9 ? 27 + c : c === 9 ? 18 + r : r;
+          tile.textContent = corner ? (r === -1 && c === -1 ? clueLabel(clueType) : '') : String(clues[unit] ?? '');
+          if (!corner) tile.setAttribute('aria-label', `${cluePosition(unit)} ${clueName(clueType)} ${clues[unit] ?? 'absent'}`);
+          if (!corner && move?.sandwichUnit === unit) {
             tile.className = 'walkthrough-driving-clue';
-            tile.setAttribute('aria-label', `${unit < 9 ? 'Row' : 'Column'} ${unit % 9 + 1} ${clueType === 'sandwich' ? 'sum' : 'edge difference'} ${clues[unit]}, driving this deduction`);
           }
         } else {
           const cell = r * 9 + c;
@@ -91,7 +93,7 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
             move?.primary?.some(entry => entry.cell === cell) && 'pattern-primary',
             move?.secondary?.some(entry => entry.cell === cell) && 'pattern-secondary',
             move?.fins?.some(entry => entry.cell === cell) && 'pattern-fin',
-            (move?.sandwichUnit === r || move?.sandwichUnit === 9 + c) && 'walkthrough-driving-unit',
+            (move?.sandwichUnit !== undefined && (move.sandwichUnit % 18 === r || move.sandwichUnit % 18 === 9 + c)) && 'walkthrough-driving-unit',
             changes.some(change => change.cell === cell) && 'deduction'].filter(Boolean).join(' ');
           if (isRing && RING.includes(cell)) tile.classList.add('walkthrough-ring-cell');
           if (isRing && CORNERS.includes(cell)) tile.classList.add('walkthrough-corner-cell');
@@ -133,7 +135,7 @@ export async function copyGridText(grid: Grid, clues: Clues, clueType: ClueType 
 export async function copyGridImage(grid: Grid, clues: Clues, clueType: ClueType = 'sandwich') {
   const canvas = document.createElement('canvas');
   const size = 64;
-  canvas.width = canvas.height = size * 10 + 8;
+  canvas.width = canvas.height = size * (fourSided(clueType) ? 11 : 10) + 8;
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = '#fffefa';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -141,7 +143,7 @@ export async function copyGridImage(grid: Grid, clues: Clues, clueType: ClueType
   ctx.textBaseline = 'middle';
   ctx.font = '16px sans-serif';
   ctx.fillStyle = '#293d39';
-  ctx.fillText(clueType === 'sandwich' ? 'SUM' : 'DIFF', size / 2, size / 2);
+  ctx.fillText(clueLabel(clueType), size / 2, size / 2);
   ctx.font = '32px sans-serif';
   ctx.fillStyle = '#293d39';
   const label = (value: number | null, row: number, col: number) => {
@@ -150,6 +152,10 @@ export async function copyGridImage(grid: Grid, clues: Clues, clueType: ClueType
   for (let i = 0; i < 9; i++) {
     label(clues[i], i + 1, 0);
     label(clues[9 + i], 0, i + 1);
+    if (fourSided(clueType)) {
+      label(clues[18 + i], i + 1, 10);
+      label(clues[27 + i], 10, i + 1);
+    }
   }
   grid.values.forEach((digit, cell) => {
     if (digit) label(digit, 1 + Math.floor(cell / 9), 1 + cell % 9);
