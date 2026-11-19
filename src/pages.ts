@@ -1,7 +1,6 @@
 const pages = [
   ['generate', 'Generate'],
   ['import-grid', 'Import grid'],
-  ['techniques', 'Techniques'],
   ['simulation', 'Simulation'],
   ['about', 'About'],
   ['custom-build', 'Custom build'],
@@ -15,7 +14,7 @@ export function mountPages() {
   document.querySelector('header')!.append(menu);
   const main = document.querySelector('main')!;
   const [intro, workspace, lower] = Array.from(main.children) as HTMLElement[];
-  const [history, techniques, transfer] = Array.from(lower.children) as HTMLDetailsElement[];
+  const [history, transfer] = Array.from(lower.children) as HTMLDetailsElement[];
   const simulation = document.createElement('section');
   simulation.className = 'card simulation';
   simulation.innerHTML = `<h1>Simulation</h1>
@@ -98,7 +97,6 @@ export function mountPages() {
     description.textContent = ({
       generate: '',
       'import-grid': 'Load a Sandwich Sudoku puzzle and check its solution.',
-      techniques: 'Explore the solver’s techniques and their difficulty scores.',
       'custom-build': 'Click cells and outside sum positions to highlight where givens may appear. Build fills only highlighted positions and verifies exactly one solution.',
       simulation: '',
       about: '',
@@ -112,8 +110,6 @@ export function mountPages() {
     workspace.hidden = !hasBoard;
     lower.hidden = page === 'simulation' || page === 'about';
     history.hidden = !hasBoard;
-    techniques.hidden = page !== 'techniques';
-    techniques.open = page === 'techniques';
     transfer.hidden = !hasBoard;
     if (page === 'import-grid') {
       transfer.open = true;
