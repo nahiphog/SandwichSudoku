@@ -35,8 +35,10 @@ clue counts buildings visible from its direction; taller buildings hide shorter
 ones. Independent clues from 1 to 9 can appear on all four sides. Skyscraper JSON
 stores 36 clues: nine left row clues, nine top column clues, nine right row clues,
 then nine bottom column clues. Rows are ordered top to bottom and columns left
-to right; use `null` for an absent clue. Paired clue digging uses positions
-opposite each other under a 180-degree rotation.
+to right; use `null` for an absent clue. Paired clue digging mirrors positions within each available side: 1 with 9,
+2 with 8, 3 with 7, and 4 with 6. The middle clue stays because it has no partner.
+This applies independently to both sides for Sandwich/Edge difference and all
+four sides for Skyscraper, X-sums, and Sum before nine.
 
 Choose **X-sums** to sum the first X digits viewed from a clue, where the first
 digit gives X and is included in the sum. For example, a top clue of 20 with

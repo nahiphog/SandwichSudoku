@@ -94,13 +94,27 @@ it('removes outside clues in matching row and column pairs', () => {
   }
 }, 60000);
 
-it.each(['skyscraper', 'x-sums', 'sum-before-nine'] as const)('digs %s clues in rotationally opposite pairs', clueType => {
-  const {grid, clues, rating} = generatePuzzle(true, true, 'pairs', undefined, clueType);
-  expect(clues).toHaveLength(36);
+it.each(['sandwich', 'edge-difference', 'skyscraper', 'x-sums', 'sum-before-nine'] as const)('digs %s clues in mirrored pairs within every side', clueType => {
+  let previous: (number | null)[] = [];
+  let removals = 0;
+  const {grid, clues, rating} = generatePuzzle(true, true, 'pairs', (_, current, phase) => {
+    if (phase === 'clues') {
+      const removed = current.flatMap((clue, i) => clue === null && previous[i] !== null ? [i] : []);
+      expect(removed).toHaveLength(2);
+      expect(Math.floor(removed[0] / 9)).toBe(Math.floor(removed[1] / 9));
+      expect(removed[0] % 9 + removed[1] % 9).toBe(8);
+      removals++;
+    }
+    previous = [...current];
+  }, clueType);
+  expect(removals).toBeGreaterThan(0);
   expect(rating).not.toBeNull();
   expect(clues).toContain(null);
-  for (let i = 0; i < 18; i++) {
-    expect(clues[i] === null).toBe(clues[18 + Math.floor(i / 9) * 9 + 8 - i % 9] === null);
+  for (let side = 0; side < clues.length / 9; side++) {
+    expect(clues[side * 9 + 4]).not.toBeNull();
+    for (let i = 0; i < 4; i++) {
+      expect(clues[side * 9 + i] === null).toBe(clues[side * 9 + 8 - i] === null);
+    }
   }
   const result = solveExact(grid, clues, 100000, clueType);
   expect(result.exhausted).toBe(false);

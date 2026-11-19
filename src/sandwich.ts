@@ -95,9 +95,8 @@ function digPuzzle(logicalOnly: boolean, rotational: boolean, digClues: boolean 
   if (digClues && digClues !== 'none') {
     let remaining = clues.length;
     const groups = digClues === 'pairs'
-      ? (fourSided(clueType)
-          ? Array.from({length: 18}, (_, index) => [index, 18 + Math.floor(index / 9) * 9 + 8 - index % 9])
-          : [0, 1, 2, 3, 9, 10, 11, 12].map(index => [index, index < 9 ? 8 - index : 26 - index]))
+      ? Array.from({length: clues.length / 9}, (_, side) =>
+          [0, 1, 2, 3].map(offset => [side * 9 + offset, side * 9 + 8 - offset])).flat()
       : Array.from(clues.keys(), index => [index]);
     for (const group of shuffle(groups)) {
       if (remaining - group.length < 1) continue;
