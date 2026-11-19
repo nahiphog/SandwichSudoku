@@ -19,8 +19,8 @@ export function mountPages() {
   const [intro, workspace, lower] = Array.from(main.children) as HTMLElement[];
   const [history, transfer] = Array.from(lower.children) as HTMLDetailsElement[];
   const techniques = document.createElement('section');
-  techniques.className = 'card';
-  techniques.innerHTML = '<h2>Techniques</h2><div class="tech-list"></div>';
+  techniques.className = 'card technique-catalog';
+  techniques.innerHTML = '<table><caption class="visually-hidden">Techniques and difficulty ratings</caption><thead><tr><th scope="col">Technique</th><th scope="col">Difficulty</th></tr></thead><tbody></tbody></table>';
   const entries = [
     ...DISPLAYED_TECHNIQUES.map(id => TECHS[id]).map(tech => ({
       name: tech.name, score: tech.score,
@@ -33,13 +33,20 @@ export function mountPages() {
     {name: 'Phistomefel Ring', score: 200, status: 'Enabled'},
   ].sort((a, b) => a.score - b.score || a.name.localeCompare(b.name));
   for (const entry of entries) {
-    const row = document.createElement('div');
-    const name = document.createElement('strong');
+    const row = document.createElement('tr');
+    const name = document.createElement('th');
+    name.scope = 'row';
     name.textContent = entry.name;
-    const detail = document.createElement('span');
-    detail.textContent = '+' + entry.score + ' · ' + entry.status;
+    if (entry.status !== 'Enabled') {
+      const status = document.createElement('small');
+      status.textContent = entry.status;
+      name.append(status);
+    }
+    const detail = document.createElement('td');
+    detail.className = 'technique-rating';
+    detail.textContent = entry.score.toLocaleString('en-US');
     row.append(name, detail);
-    techniques.querySelector('.tech-list')!.append(row);
+    techniques.querySelector('tbody')!.append(row);
   }
   main.append(techniques);
   const simulation = document.createElement('section');

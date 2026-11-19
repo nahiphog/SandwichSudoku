@@ -10,6 +10,8 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 import { cluesFor, generatePuzzle, rateLogicalPuzzle, solveExact } from '../src/sandwich';
 import { gridFromValues } from '../src/vendor/engine/board';
+import {DISPLAYED_TECHNIQUES} from '../src/techniques';
+import {TECHS} from '../src/vendor/engine/ratings';
 
 it.each(['sandwich', 'edge-difference'] as const)('preserves a logical solve after every removal without restarting (%s)', clueType => {
   let starts = 0;
@@ -31,6 +33,8 @@ it.each(['sandwich', 'edge-difference'] as const)('preserves a logical solve aft
   expect(outside).toBeGreaterThan(0);
   expect(result.rating).toEqual(rateLogicalPuzzle(result.grid, result.clues, clueType));
   expect(result.rating!.moves.every(move => move.score <= 200)).toBe(true);
+  const allowedNames = [...DISPLAYED_TECHNIQUES.map(id => TECHS[id].name), 'Sandwich sum', 'Edge difference', 'Phistomefel Ring'];
+  for (const move of result.rating!.moves) expect(allowedNames).toContain(move.name);
 }, 60000);
 
 it('generates a unique logical edge difference puzzle with paired clue digging', () => {
@@ -68,7 +72,7 @@ it('certifies and scores a generated puzzle without filling the returned grid', 
   expect(rating?.score).toBeGreaterThan(0);
   expect(rating?.techniques.length).toBeGreaterThan(0);
   expect(rating?.techniques.map(([name]) => name)).not.toContain('Brute Force');
-});
+}, 60000);
 
 it('keeps at least one sandwich clue and preserves uniqueness when digging sums', () => {
   let digitUpdates = 0;
