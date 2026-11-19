@@ -63,7 +63,7 @@ export function generate(): Grid {
 /** Keep each removal only when exact search proves the remaining puzzle unique. */
 export type SumDigMode = "none" | "single" | "pairs";
 type DigProgress = (values: number[], clues: Clues, phase: "start" | "digits" | "clues" | "rating") => void;
-function digPuzzle(logicalOnly: boolean, rotational: boolean, digClues: boolean | SumDigMode, progress?: DigProgress, clueType: ClueType = 'sandwich') {
+function digPuzzle(logicalOnly: boolean, rotational: boolean, digClues: boolean | SumDigMode, progress?: DigProgress, clueType: ClueType = 'sandwich', gridFirst = false) {
   const solution = generate();
   const clues = cluesFor(solution.values, clueType);
   const values = Array.from(solution.values);
@@ -94,16 +94,19 @@ function digPuzzle(logicalOnly: boolean, rotational: boolean, digClues: boolean 
     ...clueGroups.map(indices => ({kind: 'clues' as const, indices})),
   ];
   const pending = new Set(groups);
+  let pendingDigits = digitGroups.length;
   const byEntry = new Map(groups.flatMap(group => group.indices.map(index =>
     [group.kind + ':' + index, group] as const)));
   // Draw from current givens, including retained/protected ones. Skipping a
   // previously tested group preserves the requested per-given probabilities
   // without repeating expensive checks. Stop once every allowed group was tried.
   while (pending.size) {
-    const selected = pickDigGiven(values, clues, outsideEnabled)!;
+    const digitPhase = gridFirst && pendingDigits > 0;
+    const selected = pickDigGiven(gridFirst && !digitPhase ? [] : values, clues, outsideEnabled && !digitPhase)!;
     const group = byEntry.get(selected.kind + ':' + selected.index);
     if (!group || !pending.delete(group)) continue;
     if (group.kind === 'digits') {
+      pendingDigits--;
       for (const cell of group.indices) values[cell] = 0;
       if (canRemove(gridFromValues(values))) progress?.(values, clues, 'digits');
       else for (const cell of group.indices) values[cell] = solution.values[cell];
@@ -139,8 +142,8 @@ export function rateLogicalPuzzle(input: Grid, clues: Clues, clueType: ClueType 
   return {score, techniques: sortedTechniques, moves};
 }
 
-export function generatePuzzle(logicalOnly = false, rotational = true, digClues: boolean | SumDigMode = false, progress?: DigProgress, clueType: ClueType = 'sandwich') {
-  const puzzle = digPuzzle(logicalOnly, rotational, digClues, progress, clueType);
+export function generatePuzzle(logicalOnly = false, rotational = true, digClues: boolean | SumDigMode = false, progress?: DigProgress, clueType: ClueType = 'sandwich', gridFirst = false) {
+  const puzzle = digPuzzle(logicalOnly, rotational, digClues, progress, clueType, gridFirst);
   progress?.(Array.from(puzzle.grid.values), puzzle.clues, "rating");
   const rating = puzzle.rating ?? rateLogicalPuzzle(puzzle.grid, puzzle.clues, clueType);
   return {...puzzle, rating, solution: rating ? null : puzzle.solution};

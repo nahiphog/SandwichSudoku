@@ -57,7 +57,10 @@ Skyscraper and X-sums; `null` means absent and is distinct from zero.
 Digging interleaves grid digits and outside clues. Every currently present given
 gets one equally likely selection ticket: 50 grid digits and 15 outside clues
 give a 50/65 chance of selecting a grid digit. Selecting a paired position tests
-both partners together. Protected positions and previously tested groups are
+both partners together; each partner has its own ticket, so a pair is never
+counted as a single given. **Dig grid cells first** is off by default. Turn it on
+to attempt every allowed grid-cell removal before drawing only from outside clues.
+Rotational symmetry and mirrored outside pairs still apply in either order. Protected positions and previously tested groups are
 skipped if drawn; they remain in the current-given counts. When outside digging
 is disabled, only grid digits enter the draw. Every allowed removal group is
 tested once, and removals must preserve uniqueness and the chosen logical setting.

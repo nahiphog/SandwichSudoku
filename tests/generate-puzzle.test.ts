@@ -13,6 +13,25 @@ import { gridFromValues } from '../src/vendor/engine/board';
 import {DISPLAYED_TECHNIQUES} from '../src/techniques';
 import {TECHS} from '../src/vendor/engine/ratings';
 
+it.each(['sandwich', 'edge-difference', 'skyscraper', 'x-sums', 'sum-before-nine'] as const)(
+  'optionally finishes grid digging before outside pairs (%s)', clueType => {
+    const order: string[] = [];
+    const {grid, clues} = generatePuzzle(true, true, 'pairs', (_, __, phase) => {
+      if (phase === 'digits' || phase === 'clues') order.push(phase);
+    }, clueType, true);
+    expect(order).toContain('digits');
+    expect(order).toContain('clues');
+    expect(order.lastIndexOf('digits')).toBeLessThan(order.indexOf('clues'));
+    const result = solveExact(grid, clues, 100000, clueType);
+    expect(result.exhausted).toBe(false);
+    expect(result.solutions).toHaveLength(1);
+    for (let side = 0; side < clues.length / 9; side++) {
+      for (let i = 0; i < 4; i++) {
+        expect(clues[side * 9 + i] === null).toBe(clues[side * 9 + 8 - i] === null);
+      }
+    }
+  }, 60000);
+
 it.each(['sandwich', 'edge-difference', 'skyscraper', 'x-sums', 'sum-before-nine'] as const)('preserves a logical solve after every removal without restarting (%s)', clueType => {
   let starts = 0;
   let digits = 0;
