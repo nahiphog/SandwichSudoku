@@ -1,18 +1,46 @@
-import {applyMove, type Clues, type Move} from './sandwich';
-import {cellName, cloneGrid, digitsOf, type Grid} from './vendor/engine/board';
+import {applyMove, RING, CORNERS, type Clues, type Move} from './sandwich';
+import {bit, cellName, cloneGrid, digitsOf, type Grid} from './vendor/engine/board';
 
 export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues, moves: Move[], solution?: Uint8Array) {
   panel.innerHTML = '<h2>Solution walkthrough</h2><p aria-live="polite"></p><small>Teal marks the pattern, amber marks supporting candidates, purple marks fins. Red struck-through candidates are eliminated in this step.</small><div class="walkthrough-grid" aria-label="Walkthrough grid"></div><div class="walkthrough-nav"><button>Previous</button><button>Next</button><button>Show solution</button></div>';
   const description = panel.querySelector('p')!;
   const board = panel.querySelector('.walkthrough-grid')!;
+  const ringCounts = document.createElement('div');
+  ringCounts.className = 'walkthrough-ring-counts';
+  board.after(ringCounts);
   const [previous, next, finish] = Array.from(panel.querySelectorAll('button'));
   const end = moves.length || (solution ? 1 : 0);
   let step = 0;
   function render() {
     const grid = cloneGrid(puzzle);
-    for (const move of moves.slice(0, step)) applyMove(grid, move);
+    for (const move of moves.slice(0, Math.max(0, step - 1))) applyMove(grid, move);
+    const before = cloneGrid(grid);
+    if (step && moves[step - 1]) applyMove(grid, moves[step - 1]);
     if (step && solution) grid.values.set(solution);
     const move = moves[step - 1];
+    const isRing = move?.name === 'Phistomefel Ring';
+    ringCounts.hidden = !isRing;
+    ringCounts.replaceChildren();
+    if (isRing) {
+      const caption = document.createElement('p');
+      caption.textContent = 'Before this deduction, each range shows placed digits through placed digits plus possible candidate positions. The two sets must have the same final count for each digit.';
+      const table = document.createElement('table');
+      table.innerHTML = '<caption>Phistomefel digit counts before this step</caption><thead><tr><th>Digit</th><th>Ring · 16 cells</th><th>Corners · 16 cells</th></tr></thead>';
+      const body = table.createTBody();
+      for (let digit = 1; digit <= 9; digit++) {
+        const row = body.insertRow();
+        if ([...move.placements, ...move.eliminations].some(entry => entry.digit === digit)) row.className = 'ring-count-active';
+        row.insertCell().textContent = String(digit);
+        for (const [index, cells] of [RING, CORNERS].entries()) {
+          const placed = cells.filter(cell => before.values[cell] === digit).length;
+          const possible = cells.filter(cell => !before.values[cell] && (before.cands[cell] & bit(digit))).length;
+          const count = row.insertCell();
+          count.className = index === 0 ? 'ring-count-ring' : 'ring-count-corners';
+          count.textContent = `${placed} placed · ${placed}–${placed + possible}`;
+        }
+      }
+      ringCounts.append(caption, table);
+    }
     const changes = [...(move?.placements ?? []), ...(move?.eliminations ?? [])];
     description.textContent = move
       ? `Step ${step} of ${end} · ${move.name}. ${move.description}`
@@ -65,6 +93,8 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
             move?.fins?.some(entry => entry.cell === cell) && 'pattern-fin',
             (move?.sandwichUnit === r || move?.sandwichUnit === 9 + c) && 'walkthrough-driving-unit',
             changes.some(change => change.cell === cell) && 'deduction'].filter(Boolean).join(' ');
+          if (isRing && RING.includes(cell)) tile.classList.add('walkthrough-ring-cell');
+          if (isRing && CORNERS.includes(cell)) tile.classList.add('walkthrough-corner-cell');
         }
         board.append(tile);
       }
