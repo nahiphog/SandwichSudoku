@@ -1,5 +1,13 @@
-import { expect, it, vi } from 'vitest';
-vi.setConfig({testTimeout: 60000});
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+// A repeatable random stream keeps generation coverage stable across CI runs.
+beforeEach(() => {
+  let state = 12345;
+  vi.spyOn(Math, 'random').mockImplementation(() => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  });
+});
+afterEach(() => vi.restoreAllMocks());
 import { cluesFor, generatePuzzle, solveExact } from '../src/sandwich';
 
 it('removes digits while retaining all clues and exactly one solution', () => {
