@@ -122,6 +122,12 @@ function digPuzzle(logicalOnly: boolean, rotational: boolean, digClues: boolean 
   return {grid, clues, fullyDug, rating, solution: solution.values};
 }
 
+/** Simulation uses unrestricted, mixed, single-given digging without logical rating. */
+export function generateSimulationPuzzle(clueType: ClueType = 'sandwich') {
+  const {grid, clues, fullyDug} = digPuzzle(false, false, 'single', undefined, clueType, false);
+  return {grid, clues, fullyDug};
+}
+
 export function rateLogicalPuzzle(input: Grid, clues: Clues, clueType: ClueType = 'sandwich') {
   const grid = cloneGrid(input);
   const techniques = new Map<string, number>();

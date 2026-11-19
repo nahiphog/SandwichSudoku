@@ -1,3 +1,4 @@
+import {mountSimulation} from './simulation';
 import {TECHS} from './vendor/engine/ratings';
 import {DISPLAYED_TECHNIQUES} from './techniques';
 import {pages, pagePath, resolvePage} from './routes';
@@ -52,67 +53,9 @@ export function mountPages() {
     techniques.querySelector('tbody')!.append(row);
   }
   main.append(techniques);
-  const simulation = document.createElement('section');
-  simulation.className = 'card simulation';
-  simulation.innerHTML = `<h1>Simulation</h1>
-    <p>Generate sample grids, remove random digits, and check whether each puzzle has a unique solution.</p>
-    <form><fieldset class="clue-switch"><legend>Choose your puzzle type</legend><select name="clueType" aria-label="Choose your puzzle type"><option value="sandwich">Sandwich sums</option><option value="edge-difference">Edge difference</option><option value="skyscraper">Skyscraper</option><option value="x-sums">X-sums</option><option value="sum-before-nine">Sum before nine</option></select></fieldset><label>Samples <input name="samples" type="number" min="1" max="100" value="10" required></label>
-    <label>Digits to remove <input name="removed" type="number" min="0" max="81" value="35" required></label>
-    <button class="primary">Run simulation</button><button type="button" hidden>Cancel</button></form>
-    <p role="status"></p><button id="simulation-export" hidden>Download results CSV</button>
-    <div class="simulation-table"><table hidden><thead><tr><th>Sample</th><th>Givens</th><th>Result</th><th>Milliseconds</th></tr></thead><tbody></tbody></table></div>`;
+  const simulation = mountSimulation();
   const about = workspace.querySelector<HTMLElement>('.rules')!;
   main.append(simulation, about);
-  const form = simulation.querySelector('form')!;
-  const start = form.querySelector('button')!;
-  const cancel = form.querySelector<HTMLButtonElement>('button[type=button]')!;
-  const output = simulation.querySelector('[role=status]')!;
-  const table = simulation.querySelector('table')!;
-  const exportButton = simulation.querySelector<HTMLButtonElement>('#simulation-export')!;
-  let runner: Worker | undefined;
-  let csv: string[] = [];
-  function stop(message: string) {
-    runner?.terminate();
-    runner = undefined;
-    output.textContent = message;
-    start.disabled = false;
-    cancel.hidden = true;
-  }
-  form.onsubmit = event => {
-    event.preventDefault();
-    const data = new FormData(form);
-    const samples = Number(data.get('samples'));
-    const removed = Number(data.get('removed'));
-    csv = ['Sample,Givens,Result,Milliseconds'];
-    table.tBodies[0].replaceChildren();
-    table.hidden = true;
-    exportButton.hidden = true;
-    start.disabled = true;
-    cancel.hidden = false;
-    output.textContent = `Running 0 of ${samples} samples…`;
-    runner = new Worker(new URL('./simulation-worker.ts', import.meta.url), {type: 'module'});
-    runner.onmessage = ({data: {sample, givens, result, elapsed}}) => {
-      const row = table.tBodies[0].insertRow();
-      const fields = [sample, givens, result, elapsed];
-      for (const field of fields) row.insertCell().textContent = String(field);
-      csv.push(fields.join(','));
-      table.hidden = false;
-      exportButton.hidden = false;
-      if (sample === samples) stop(`Completed ${samples} samples.`);
-      else output.textContent = `Running ${sample} of ${samples} samples…`;
-    };
-    runner.onerror = () => stop('Simulation stopped after a calculation error.');
-    runner.postMessage({samples, removed, clueType: data.get('clueType')});
-  };
-  cancel.onclick = () => stop('Simulation cancelled. Completed samples are available below.');
-  exportButton.onclick = () => {
-    const url = URL.createObjectURL(new Blob([csv.join('\n')], {type: 'text/csv'}));
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'sandwich-simulation.csv';
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
 
   const heading = intro.querySelector('h1')!;
   const description = intro.querySelector('p')!;

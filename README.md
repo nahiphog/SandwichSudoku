@@ -91,3 +91,18 @@ The tests cover generation, sums, line-filter soundness, ring membership and
 deductions, score metadata, imported steps, uniqueness, ambiguity, contradictions,
 and budget exhaustion. The UI uses no server or account and sends no puzzle data
 off-device. Google Fonts is optional; local font fallbacks are provided.
+
+## Simulation
+
+Total trials offers 1, 10, 100, 1,000, 10,000, 100,000, and 1,000,000 (default).
+The display limit ranges from 1 to 60 total givens (default 60), counting grid
+digits and every outside clue, including zero. Each trial uses unrestricted
+logical/brute-force digging, no rotational symmetry, single outside-clue
+removals, and mixed grid/outside selection. Logical rating is skipped.
+
+The vertical-bar histogram updates after every completed puzzle. Matching
+puzzles are retained in memory and paginated ten per page, with generation
+time in Malaysia time, total givens, and a clipboard button for importable JSON.
+Cancellation retains completed results; a new run or reload clears them.
+Histogram counts can be downloaded as CSV. Digging search-limit cases remain
+verified unique and are labelled separately from fully dug puzzles.
