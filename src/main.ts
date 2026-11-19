@@ -1,42 +1,48 @@
 import {mountWalkthrough, copyGridImage, copyGridText} from './grid-output';
-import {mountPages} from './pages';
+import {mountPages, appBase} from './pages';
 import './style.css';
 import {gridFromValues,cloneGrid,digitsOf,isSolved,type Grid} from './vendor/engine/board';
-import {applyMove,type Clues,type Move} from './sandwich';
+import {applyMove,type Clues,type Move,type ClueType} from './sandwich';
 
 let grid=gridFromValues(new Array(81).fill(0)), clues: Clues=new Array(18).fill(null), selected=40, candidates=false, score=0, history:Move[]=[], pending:Move|null=null;
+let clueType: ClueType = 'sandwich';
 let worker:Worker|null=null;
 const customCells = new Set<number>();
 const customSums = new Set<number>();
 let preview: {grid: Grid; clues: Clues} | null = null;
 let progressTimer: ReturnType<typeof setTimeout> | undefined;
-const undo:{grid:Grid;clues:Clues;score:number;history:Move[]}[]=[];
+const undo:{grid:Grid;clues:Clues;score:number;history:Move[];clueType:ClueType}[]=[];
 const app=document.querySelector<HTMLDivElement>('#app')!;
-app.innerHTML=`<header><a class="brand" href="./"><img src="${import.meta.env.BASE_URL}sandwich.svg" width="38" height="38" alt=""> Sandwich Sudoku</a></header>
-<main><section class="intro"><div><h1>Generate</h1><p hidden></p></div><div class="generation-actions"><label><input id="logical-only" type="checkbox" checked> No brute force method</label><label><input id="rotational" type="checkbox" checked> Rotational symmetry</label><label>Sandwich sums <select id="dig-clues"><option value="none">Do not dig sandwich sums</option><option value="single" selected>Dig sandwich sums one at a time</option><option value="pairs">Dig sandwich sums in pairs</option></select></label><button id="generate-puzzle" class="primary">Generate puzzle</button><button id="custom-generate" hidden>Build from highlighted entries</button><button id="custom-clear" hidden>Clear highlights</button><button id="cancel-generation" hidden>Cancel</button></div></section>
-<div class="workspace"><section class="board-panel"><div class="panel-top"><div><span class="dot"></span><strong id="board-title">Your grid</strong></div><span id="filled"></span></div><div class="board-wrap"><div id="board" role="group" aria-label="Editable sandwich sudoku grid"></div></div><div class="board-tools"><button id="notes" aria-pressed="false">Candidates</button><button id="undo">↶ Undo</button></div><div class="board-tools copy-tools"><button id="copy-string">Copy grid string</button><button id="copy-image">Copy grid image</button></div><div class="keypad">${Array.from({length:9},(_,i)=>`<button data-digit="${i+1}" aria-label="Enter ${i+1}">${i+1}</button>`).join('')}<button data-digit="0" aria-label="Erase selected cell">⌫</button></div><p class="board-caption">Select a cell to edit · 1–9 to enter · Delete to erase · Arrow keys to move</p></section>
+app.innerHTML=`<header><a class="brand" href="${appBase}"><img src="${appBase}sandwich.svg" width="38" height="38" alt=""> Sandwich Sudoku</a></header>
+<main><section class="intro"><div><h1>Generate</h1><p hidden></p></div><div class="generation-actions"><label><input id="logical-only" type="checkbox" checked> No brute force method</label><label><input id="rotational" type="checkbox" checked> Rotational symmetry</label><label>Outside clues <select id="dig-clues"><option value="none">Do not dig outside clues</option><option value="single" selected>Dig outside clues one at a time</option><option value="pairs">Dig outside clues in pairs</option></select></label><button id="generate-puzzle" class="primary">Generate puzzle</button><button id="custom-generate" hidden>Build from highlighted entries</button><button id="custom-clear" hidden>Clear highlights</button><button id="cancel-generation" hidden>Cancel</button></div></section>
+<div class="workspace"><section class="board-panel"><div class="panel-top"><div><span class="dot"></span><strong id="board-title">Your grid</strong></div><span id="filled"></span></div><div class="board-wrap"><div id="board" role="group" aria-label="Editable sandwich sudoku grid"></div></div><div class="board-tools"><label>Clue type <select id="clue-type"><option value="sandwich">Sandwich sum</option><option value="edge-difference">Edge difference</option></select></label></div><p id="clue-help" class="board-caption"></p><div class="board-tools"><button id="notes" aria-pressed="false">Candidates</button><button id="undo">↶ Undo</button></div><div class="board-tools copy-tools"><button id="copy-string">Copy grid string</button><button id="copy-image">Copy grid image</button></div><div class="keypad">${Array.from({length:9},(_,i)=>`<button data-digit="${i+1}" aria-label="Enter ${i+1}">${i+1}</button>`).join('')}<button data-digit="0" aria-label="Erase selected cell">⌫</button></div><p class="board-caption">Select a cell to edit · 1–9 to enter · Delete to erase · Arrow keys to move</p></section>
 <aside><section class="card rules"><h2>Meet sandwich sudoku.</h2><p>Normal sudoku rules apply. Clues outside the grid give the sum of digits <strong>between 1 and 9</strong> in that row or column, not including the 1 and 9 themselves.</p><div class="example"><span>1</span><b>3</b><b>5</b><b>2</b><span>9</span><em> = 10</em></div><small>Only the filling counts. Adjacent 1 and 9 give 0.</small></section>
 <section class="card"><div class="card-heading"><h2>Solving desk</h2><span class="badge"><b id="score">0</b> points</span></div><p id="status" role="status" aria-live="polite">Generate a puzzle or enter your own digits and clues.</p><div class="actions"><button id="hint" class="primary">Find next step →</button><button id="solve">Solve & check uniqueness</button><button id="cancel" hidden>Cancel calculation</button></div><div id="generation-rating" hidden></div><div id="hint-detail"></div><div class="minor-actions"><button id="blank">Blank grid</button><button id="clear">Clear digits, keep clues</button></div></section>
 <section id="walkthrough" class="card" hidden></section></aside></div>
-<section class="lower"><details class="card"><summary>Solving history <span id="step-count">0 steps</span></summary><ol id="history"></ol></details><details class="card"><summary>Import / export <span>Save your construction</span></summary><p>JSON stores all 81 digits and 18 clues (rows, then columns). Use null for an absent clue.</p><textarea id="data" aria-label="Puzzle JSON" placeholder="Paste exported puzzle JSON"></textarea><div class="minor-actions"><button id="export">Export</button><button id="import">Import</button></div></details></section>
+<section class="lower"><details class="card"><summary>Solving history <span id="step-count">0 steps</span></summary><ol id="history"></ol></details><details class="card"><summary>Import / export <span>Save your construction</span></summary><p>JSON stores the clue type, all 81 digits and 18 clues (rows, then columns). Use null for an absent clue.</p><textarea id="data" aria-label="Puzzle JSON" placeholder="Paste exported puzzle JSON"></textarea><div class="minor-actions"><button id="export">Export</button><button id="import">Import</button></div></details></section>
 </main>`;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 function status(s:string){el('status').textContent=s}
 function stop(){clearTimeout(progressTimer);el("cancel-generation").hidden=true;if(preview){preview=null;render();}worker?.terminate();worker=null;el<HTMLButtonElement>('generate-puzzle').disabled=false;el('cancel').hidden=true;el<HTMLButtonElement>('hint').disabled=false;el<HTMLButtonElement>('solve').disabled=false;}
-function save(){stop();el("walkthrough").hidden=true;el("generation-rating").hidden=true;undo.push({grid:cloneGrid(grid),clues:[...clues],score,history:[...history]});pending=null;}
+function save(){stop();el("walkthrough").hidden=true;el("generation-rating").hidden=true;undo.push({grid:cloneGrid(grid),clues:[...clues],score,history:[...history],clueType});pending=null;}
 function resetRating(){score=0;history=[];pending=null}
 function edit(cell:number,digit:number){save();const values=Array.from(grid.values);values[cell]=digit;grid=gridFromValues(values);resetRating();render();status('Grid updated. Find a logical step or check its solutions.');}
+const sandwichRules = document.querySelector('.rules')!.innerHTML;
 function render(){
+  el<HTMLSelectElement>('clue-type').value = clueType;
+  el('clue-help').textContent = clueType === 'sandwich' ? 'Outside clues sum the digits between 1 and 9.' : 'Left clues: |first − last| in each row. Top clues: |top − bottom| in each column. Differences range from 1 to 8.';
+  document.querySelector('.rules')!.innerHTML = clueType === 'sandwich' ? sandwichRules : '<h2>Meet edge difference sudoku.</h2><p>Normal sudoku rules apply. Each outside clue gives the <strong>absolute difference between the two end cells</strong>. Left clues compare the first and last cells of a row; top clues compare the top and bottom cells of a column.</p><div class="example"><span>9</span><em> − </em><span>2</span><em> = 7</em></div><small>Either order works: |2 − 9| is also 7. Clues range from 1 to 8.</small>';
+  el('board').setAttribute('aria-label', clueType === 'sandwich' ? 'Editable sandwich sudoku grid' : 'Editable edge difference sudoku grid');
   const shownGrid = preview?.grid ?? grid;
   const shownClues = preview?.clues ?? clues;
   const board=el('board');board.replaceChildren();
-  const corner=document.createElement('div');corner.className='clue-label';corner.textContent='SUM';board.append(corner);
-  function clueInput(u:number){const input=document.createElement('input');input.className='clue';input.type='text';input.inputMode='numeric';input.maxLength=2;input.value=shownClues[u]===null?'':String(shownClues[u]);input.readOnly=!!preview;input.placeholder='·';input.setAttribute('aria-label',`${u<9?'Row':'Column'} ${u%9+1} sandwich clue`);if(document.body.dataset.page==='custom-build'){
+  const corner=document.createElement('div');corner.className='clue-label';corner.textContent=clueType === 'sandwich' ? 'SUM' : 'DIFF';board.append(corner);
+  function clueInput(u:number){const input=document.createElement('input');input.className='clue';input.type='text';input.inputMode='numeric';input.maxLength=2;input.value=shownClues[u]===null?'':String(shownClues[u]);input.readOnly=!!preview;input.placeholder='·';input.setAttribute('aria-label',`${u<9?'Row':'Column'} ${u%9+1} ${clueType === 'sandwich' ? 'sandwich sum' : 'edge difference'} clue`);if(document.body.dataset.page==='custom-build'){
       input.readOnly=true;
       input.classList.toggle('custom-highlight',customSums.has(u));
       input.onclick=()=>{customSums.has(u)?customSums.delete(u):customSums.add(u);render()};
     }
-    input.onchange=()=>{const raw=input.value.trim(),v=raw===''?null:Number(raw);if(v!==null&&(!/^\d+$/.test(raw)||!Number.isInteger(v)||v<0||v>35)){status('Clues must be whole numbers from 0 to 35, or blank.');render();return}save();clues[u]=v;grid=gridFromValues(grid.values);resetRating();render();status('Clue updated.');};return input}
+    input.onchange=()=>{const raw=input.value.trim(),v=raw===''?null:Number(raw);if(v!==null&&(!/^\d+$/.test(raw)||!Number.isInteger(v)||v<(clueType === 'sandwich' ? 0 : 1)||v>(clueType === 'sandwich' ? 35 : 8))){status(clueType === 'sandwich' ? 'Clues must be whole numbers from 0 to 35, or blank.' : 'Edge differences must be whole numbers from 1 to 8, or blank.');render();return}save();clues[u]=v;grid=gridFromValues(grid.values);resetRating();render();status('Clue updated.');};return input}
   for(let c=0;c<9;c++)board.append(clueInput(9+c));
   for(let r=0;r<9;r++){board.append(clueInput(r));for(let c=0;c<9;c++){
     const i=r*9+c,b=document.createElement('button');b.className='cell';b.dataset.cell=String(i);
@@ -54,11 +60,11 @@ function render(){
   el('hint-detail').replaceChildren();if(pending){const p=document.createElement('p');p.textContent=`${pending.name} (+${pending.score}): ${pending.description}`;const b=document.createElement('button');b.textContent='Apply this step';b.className='primary';b.onclick=()=>{const move=pending!;save();applyMove(grid,move);history.push(move);score+=move.score;render();status(isSolved(grid)?'Grid filled. Use Solve & check uniqueness to verify.':'Step applied. Find the next deduction when ready.');};el('hint-detail').append(p,b)}
 }
 function run(action:'hint'|'solve'){
-  stop();pending=null;render();status(action==='hint'?'Looking for a logical deduction…':'Searching for solutions that satisfy every sandwich clue…');
+  stop();pending=null;render();status(action==='hint'?'Looking for a logical deduction…':'Searching for solutions that satisfy every outside clue…');
   el<HTMLButtonElement>('hint').disabled=true;el<HTMLButtonElement>('solve').disabled=true;el('cancel').hidden=false;
   worker=new Worker(new URL('./worker.ts',import.meta.url),{type:'module'});
-  worker.onmessage=({data})=>{stop();if(data.error){status(data.error);return}if(action==='hint'){pending=data.result;render();status(pending?'A deduction is ready. Highlighted cells will change when you apply it.':isSolved(grid)?'This completed grid satisfies all Sudoku and sandwich rules.':'No logical step found. Exact search can check this position.');}else{const {solutions,exhausted}=data.result;if(solutions.length){save();grid=solutions[0];resetRating();render();status(solutions.length>1?'Multiple solutions found. Showing one; add more givens or clues to make the puzzle unique.':exhausted?'One solution found; search limit reached, so uniqueness is unknown.':'Exactly one solution found. All Sudoku and sandwich constraints are satisfied.')}else status(exhausted?'Search limit reached. No conclusion yet; add more givens or clues.':'No solution satisfies this grid and its clues.')}};
-  worker.onerror=()=>{stop();status('Calculation failed. Your puzzle is unchanged; please try again.')};worker.postMessage({action,grid,clues});
+  worker.onmessage=({data})=>{stop();if(data.error){status(data.error);return}if(action==='hint'){pending=data.result;render();status(pending?'A deduction is ready. Highlighted cells will change when you apply it.':isSolved(grid)?'This completed grid satisfies all Sudoku and selected clue rules.':'No logical step found. Exact search can check this position.');}else{const {solutions,exhausted}=data.result;if(solutions.length){save();grid=solutions[0];resetRating();render();status(solutions.length>1?'Multiple solutions found. Showing one; add more givens or clues to make the puzzle unique.':exhausted?'One solution found; search limit reached, so uniqueness is unknown.':'Exactly one solution found. All Sudoku and selected clue constraints are satisfied.')}else status(exhausted?'Search limit reached. No conclusion yet; add more givens or clues.':'No solution satisfies this grid and its clues.')}};
+  worker.onerror=()=>{stop();status('Calculation failed. Your puzzle is unchanged; please try again.')};worker.postMessage({action,grid,clues,clueType});
 }
 el('generate-puzzle').onclick = () => {
   stop();
@@ -83,7 +89,7 @@ el('generate-puzzle').onclick = () => {
         preview = {grid: gridFromValues(values), clues};
         render();
         status(phase === 'rating' ? 'Checking the logical solve…'
-          : phase === 'clues' ? 'Removing sandwich sums…' : 'Removing digits…');
+          : phase === 'clues' ? 'Removing outside clues…' : 'Removing digits…');
       });
     } else {
       updates.push(() => finish(data));
@@ -99,7 +105,7 @@ el('generate-puzzle').onclick = () => {
     render();
     const report = el('generation-rating');
     const rating = data.result.rating;
-    const walkthrough = mountWalkthrough(el("walkthrough"), grid, clues, rating?.moves ?? [], data.result.solution ?? undefined);
+    const walkthrough = mountWalkthrough(el("walkthrough"), grid, clues, rating?.moves ?? [], data.result.solution ?? undefined, clueType);
     report.hidden = false;
     report.replaceChildren();
     const title = document.createElement('h3');
@@ -146,7 +152,7 @@ el('generate-puzzle').onclick = () => {
     stop();
     status('Puzzle generation failed. Please try again.');
   };
-  worker.postMessage({action: document.body.dataset.page === 'custom-build' ? 'custom-build' : 'generate-puzzle', cells: [...customCells], sums: [...customSums], logicalOnly: el<HTMLInputElement>('logical-only').checked, rotational: el<HTMLInputElement>('rotational').checked, digClues: el<HTMLSelectElement>('dig-clues').value});
+  worker.postMessage({action: document.body.dataset.page === 'custom-build' ? 'custom-build' : 'generate-puzzle', clueType, cells: [...customCells], sums: [...customSums], logicalOnly: el<HTMLInputElement>('logical-only').checked, rotational: el<HTMLInputElement>('rotational').checked, digClues: el<HTMLSelectElement>('dig-clues').value});
 };
 el('custom-generate').onclick = () => el('generate-puzzle').click();
 el('custom-clear').onclick = () => {customCells.clear();customSums.clear();render()};
@@ -162,21 +168,31 @@ el('cancel-generation').onclick = () => {
   ({grid, clues} = visiblePuzzle);
   resetRating();
   render();
-  status('Generation cancelled. The grid and sums shown at cancellation were kept.');
+  status('Generation cancelled. The grid and clues shown at cancellation were kept.');
 };
-el('blank').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));clues=new Array(18).fill(null);resetRating();render();status('Enter givens and outside clues to build a sandwich puzzle.')};
-el('clear').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));resetRating();render();status('Digits cleared; sandwich clues retained. Clues alone may allow multiple solutions.')};
-el('undo').onclick=()=>{const old=undo.pop();if(old){stop();el('walkthrough').hidden=true;el('generation-rating').hidden=true;({grid,clues,score,history}=old);pending=null;render();status('Last change undone.')}};
+el('clue-type').onchange = () => {
+  const nextType = el<HTMLSelectElement>('clue-type').value as ClueType;
+  save();
+  clueType = nextType;
+  clues = new Array(18).fill(null);
+  grid = gridFromValues(grid.values);
+  resetRating();
+  render();
+  status('Clue type changed. Previous clues cleared; enter new clues or generate a puzzle. Undo restores the previous puzzle.');
+};
+el('blank').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));clues=new Array(18).fill(null);resetRating();render();status('Enter givens and outside clues to build a puzzle.')};
+el('clear').onclick=()=>{save();grid=gridFromValues(new Array(81).fill(0));resetRating();render();status('Digits cleared; outside clues retained. Clues alone may allow multiple solutions.')};
+el('undo').onclick=()=>{const old=undo.pop();if(old){stop();el('walkthrough').hidden=true;el('generation-rating').hidden=true;({grid,clues,score,history,clueType}=old);pending=null;render();status('Last change undone.')}};
 el('notes').onclick=()=>{candidates=!candidates;render()};
 el('hint').onclick=()=>run('hint');el('solve').onclick=()=>run('solve');el('cancel').onclick=()=>{stop();status('Calculation cancelled. Your grid is unchanged.')};
 document.querySelectorAll<HTMLButtonElement>('[data-digit]').forEach(b=>b.onclick=()=>edit(selected,Number(b.dataset.digit)));
 window.addEventListener('keydown',e=>{if(el('board').closest<HTMLElement>('.workspace')?.hidden||document.body.dataset.page==='custom-build'||e.target instanceof HTMLSelectElement||e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||(e.target instanceof HTMLElement && e.target.closest('.page-menu')))return;if(/^[1-9]$/.test(e.key)){e.preventDefault();edit(selected,Number(e.key))}else if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();edit(selected,0)}else if(e.key.startsWith('Arrow')){e.preventDefault();const dr=e.key==='ArrowUp'?-9:e.key==='ArrowDown'?9:e.key==='ArrowLeft'?-1:1;selected=(selected+dr+81)%81;render();el('board').querySelector<HTMLButtonElement>(`[data-cell="${selected}"]`)?.focus()}});
-el('export').onclick=()=>{el<HTMLTextAreaElement>('data').value=JSON.stringify({version:1,values:Array.from(grid.values),clues},null,2);status('Puzzle exported below. Copy the JSON to save it.')};
-el('import').onclick=()=>{try{const data=JSON.parse(el<HTMLTextAreaElement>('data').value);if(!Array.isArray(data.values)||data.values.length!==81||!data.values.every((v:unknown)=>Number.isInteger(v)&&Number(v)>=0&&Number(v)<=9)||!Array.isArray(data.clues)||data.clues.length!==18||!data.clues.every((v:unknown)=>v===null||(Number.isInteger(v)&&Number(v)>=0&&Number(v)<=35)))throw Error();save();grid=gridFromValues(data.values);clues=data.clues;resetRating();render();status('Puzzle imported. Check its validity with the solver.')}catch{status('Invalid JSON: expected 81 digits (0–9) and 18 clues (0–35 or null).')}};
+el('export').onclick=()=>{el<HTMLTextAreaElement>('data').value=JSON.stringify({version:1,clueType,values:Array.from(grid.values),clues},null,2);status('Puzzle exported below. Copy the JSON to save it.')};
+el('import').onclick=()=>{try{const data=JSON.parse(el<HTMLTextAreaElement>('data').value);const importedType = data.clueType ?? 'sandwich';if(importedType !== 'sandwich' && importedType !== 'edge-difference')throw Error();if(!Array.isArray(data.values)||data.values.length!==81||!data.values.every((v:unknown)=>Number.isInteger(v)&&Number(v)>=0&&Number(v)<=9)||!Array.isArray(data.clues)||data.clues.length!==18||!data.clues.every((v:unknown)=>v===null||(Number.isInteger(v)&&Number(v)>=(importedType === 'sandwich' ? 0 : 1)&&Number(v)<=(importedType === 'sandwich' ? 35 : 8))))throw Error();save();grid=gridFromValues(data.values);clues=data.clues;clueType=importedType;resetRating();render();status('Puzzle imported. Check its validity with the solver.')}catch{status('Invalid JSON: expected 81 digits (0–9) and 18 clues (sandwich: 0–35; edge difference: 1–8; or null), and a valid clueType.')}};
 render();
 
-el('copy-string').onclick = async () => status(await copyGridText(grid, clues));
-el('copy-image').onclick = async () => status(await copyGridImage(grid, clues));
+el('copy-string').onclick = async () => status(await copyGridText(grid, clues, clueType));
+el('copy-image').onclick = async () => status(await copyGridImage(grid, clues, clueType));
 el('walkthrough').addEventListener('walkthroughstepchange', event => {
   const step = (event as CustomEvent<{step: number}>).detail.step;
   el('generation-rating').querySelectorAll('tr').forEach(row => row.classList.remove('active-technique-row'));

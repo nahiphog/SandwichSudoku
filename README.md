@@ -9,11 +9,26 @@ npm test
 npm run build
 ```
 
+Subpages use clean paths such as `about/`, `import-grid/`, and `custom-build/`.
+The build emits an HTML entry for every subpage so direct links and refreshes
+work on static hosting, including GitHub Pages project sites. Older `?page=`
+links automatically switch to the corresponding path.
+
 Generate creates a completely filled valid Sudoku and displays nine column sums
 above the grid and nine row sums to its left. Each sum excludes the 1 and 9.
 Click a cell and type, use the keypad, or edit any outside clue. Blank clues are
 absent constraints; zero clues require adjacent 1 and 9. Clear digits retains
 the clues; Blank grid clears both. JSON import/export saves constructions.
+
+Choose **Edge difference** in the Clue type selector below the grid to use
+absolute endpoint differences instead of sandwich sums. Left clues compare
+the first and last cells of each row; top clues compare the top and bottom
+cells of each column. For example, endpoints 2 and 9 give 7 in either order.
+Edge clues range from 1 to 8. Generation, custom builds, hints, exact solving,
+walkthroughs, and copied puzzles use the selected rule. Simulation has its own
+clue type selector. Switching types clears the old clues and resets candidates;
+Undo restores the previous puzzle. JSON stores `clueType` as `sandwich` or
+`edge-difference`; older JSON without this field defaults to sandwich sums.
 
 Find next step previews a deduction; Apply this step records its explanation and
 score. Candidate eliminations persist until the construction is edited. Undo

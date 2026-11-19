@@ -3,6 +3,7 @@ import { findNextStep, applyStep } from './vendor/engine/humanSolver';
 import { TECHS, SOLVE_ORDER } from './vendor/engine/ratings';
 import type { CellDigit } from './vendor/engine/steps';
 
+export type ClueType = "sandwich" | "edge-difference";
 export type Clues = (number | null)[]; // rows first, then columns; null is not zero
 export interface Move {
   name: string;
@@ -13,7 +14,7 @@ export interface Move {
   primary?: CellDigit[];
   secondary?: CellDigit[];
   fins?: CellDigit[];
-  /** Row 0–8 or column 9–17 whose outside sum drives this deduction. */
+  /** Row 0–8 or column 9–17 whose outside clue drives this deduction. */
   sandwichUnit?: number;
 }
 export const RING = Array.from({length:81},(_,i)=>i).filter(i=>{const r=Math.floor(i/9),c=i%9;return r>=2&&r<=6&&c>=2&&c<=6&&(r===2||r===6||c===2||c===6)});
@@ -23,7 +24,8 @@ export function sandwichSum(line: number[]): number {
   if(a<0||b<0) throw new Error('A complete line needs 1 and 9.');
   return line.slice(Math.min(a,b)+1,Math.max(a,b)).reduce((s,d)=>s+d,0);
 }
-export const cluesFor = (values: ArrayLike<number>): Clues => UNITS.slice(0,18).map(u=>sandwichSum(u.map(i=>values[i])));
+export const edgeDifference = (line: number[]): number => Math.abs(line[0] - line[8]);
+export const cluesFor = (values: ArrayLike<number>, clueType: ClueType = 'sandwich'): Clues => UNITS.slice(0,18).map(u=>(clueType === 'edge-difference' ? edgeDifference : sandwichSum)(u.map(i=>values[i])));
 const shuffle = <T>(a:T[]):T[] => {for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 /** Randomized backtracking, so generation is not limited to one base-grid pattern. */
 export function generate(): Grid {
@@ -38,9 +40,9 @@ export function generate(): Grid {
 /** Keep each removal only when exact search proves the remaining puzzle unique. */
 export type SumDigMode = "none" | "single" | "pairs";
 type DigProgress = (values: number[], clues: Clues, phase: "start" | "digits" | "clues" | "rating") => void;
-function digPuzzle(rotational: boolean, digClues: boolean | SumDigMode, progress?: DigProgress) {
+function digPuzzle(rotational: boolean, digClues: boolean | SumDigMode, progress?: DigProgress, clueType: ClueType = 'sandwich') {
   const solution = generate();
-  const clues = cluesFor(solution.values);
+  const clues = cluesFor(solution.values, clueType);
   const values = Array.from(solution.values);
   const groups = rotational
     ? Array.from({length: 40}, (_, cell) => [cell, 80 - cell])
@@ -49,7 +51,7 @@ function digPuzzle(rotational: boolean, digClues: boolean | SumDigMode, progress
   let fullyDug = true;
   for (const group of shuffle(groups)) {
     for (const cell of group) values[cell] = 0;
-    const check = solveExact(gridFromValues(values), clues, 250);
+    const check = solveExact(gridFromValues(values), clues, 250, clueType);
     if (check.exhausted) fullyDug = false;
     if (check.exhausted || check.solutions.length !== 1) {
       for (const cell of group) values[cell] = solution.values[cell];
@@ -68,7 +70,7 @@ function digPuzzle(rotational: boolean, digClues: boolean | SumDigMode, progress
       if (remaining - group.length < 1) continue;
       const originals = group.map(index => clues[index]);
       for (const index of group) clues[index] = null;
-      const check = solveExact(grid, clues, 250);
+      const check = solveExact(grid, clues, 250, clueType);
       if (check.exhausted) fullyDug = false;
       if (!check.exhausted && check.solutions.length === 1) {
         remaining -= group.length;
@@ -79,38 +81,39 @@ function digPuzzle(rotational: boolean, digClues: boolean | SumDigMode, progress
   return {grid, clues, fullyDug, solution: solution.values};
 }
 
-export function rateLogicalPuzzle(input: Grid, clues: Clues) {
+export function rateLogicalPuzzle(input: Grid, clues: Clues, clueType: ClueType = 'sandwich') {
   const grid = cloneGrid(input);
   const techniques = new Map<string, number>();
   const moves: Move[] = [];
   let score = 0;
   while (!isSolved(grid)) {
-    const move = nextMove(grid, clues);
+    const move = nextMove(grid, clues, clueType);
     if (!move) return null;
     moves.push(move);
     applyMove(grid, move);
     techniques.set(move.name, (techniques.get(move.name) ?? 0) + 1);
     score += move.score;
   }
-  validate(grid, clues);
+  validate(grid, clues, clueType);
   const weights = new Map(moves.map(move => [move.name, move.score]));
   const sortedTechniques = [...techniques].sort(([a], [b]) =>
     weights.get(a)! - weights.get(b)! || a.localeCompare(b));
   return {score, techniques: sortedTechniques, moves};
 }
 
-export function generatePuzzle(logicalOnly = false, rotational = true, digClues: boolean | SumDigMode = false, progress?: DigProgress) {
+export function generatePuzzle(logicalOnly = false, rotational = true, digClues: boolean | SumDigMode = false, progress?: DigProgress, clueType: ClueType = 'sandwich') {
   for (let attempt = 0; attempt < 10; attempt++) {
-    const puzzle = digPuzzle(rotational, digClues, progress);
+    const puzzle = digPuzzle(rotational, digClues, progress, clueType);
     progress?.(Array.from(puzzle.grid.values), puzzle.clues, "rating");
-    const rating = rateLogicalPuzzle(puzzle.grid, puzzle.clues);
+    const rating = rateLogicalPuzzle(puzzle.grid, puzzle.clues, clueType);
     if (!logicalOnly || rating) return {...puzzle, rating, solution: rating ? null : puzzle.solution};
   }
   throw new Error('No puzzle with a complete logical solve was found. Try generating again.');
 }
 
 /** All compatible permutations of a line; union their candidates for sound eliminations. */
-export function lineSupport(g:Grid, cells:number[], clue:number):number[]|null {
+export function lineSupport(g:Grid, cells:number[], clue:number, clueType: ClueType = 'sandwich'):number[]|null {
+  if (clueType === 'edge-difference') return edgeSupport(g, cells, clue);
   const support=new Array<number>(9).fill(0), line=new Array<number>(9).fill(0);
   let count=0;
   const visit=(p:number,used:number,phase:number,sum:number):void=>{
@@ -127,14 +130,38 @@ export function lineSupport(g:Grid, cells:number[], clue:number):number[]|null {
   };
   visit(0,0,0,0);return count?support:null;
 }
-export function sandwichMove(g:Grid,clues:Clues):Move|null {
+/** Memoized permutations enforce endpoint differences and distinct digits. */
+function edgeSupport(g: Grid, cells: number[], clue: number): number[] | null {
+  if (!Number.isInteger(clue) || clue < 1 || clue > 8) return null;
+  const masks = cells.map(cell => g.values[cell] ? bit(g.values[cell]) : g.cands[cell]);
+  const support = new Array<number>(9).fill(0);
+  const memo = new Map<number, boolean>();
+  function visit(p: number, used: number, first: number): boolean {
+    if (p === 9) return true;
+    const key = (first * 10 + p) * 1024 + used;
+    if (memo.has(key)) return memo.get(key)!;
+    let valid = false;
+    for (const digit of digitsOf(masks[p] & ~used)) {
+      if (p === 8 && Math.abs(first - digit) !== clue) continue;
+      if (p === 0 && !digitsOf(masks[8]).some(last => Math.abs(digit - last) === clue)) continue;
+      if (visit(p + 1, used | bit(digit), p === 0 ? digit : first)) {
+        support[p] |= bit(digit);
+        valid = true;
+      }
+    }
+    memo.set(key, valid);
+    return valid;
+  }
+  return visit(0, 0, 0) ? support : null;
+}
+export function sandwichMove(g:Grid,clues:Clues, clueType: ClueType = 'sandwich'):Move|null {
   for(let u=0;u<18;u++){
     if(clues[u]===null)continue;
-    const support=lineSupport(g,UNITS[u],clues[u]!);
-    if(!support)throw new Error(`${u<9?'Row':'Column'} ${u%9+1} cannot satisfy its sandwich clue.`);
+    const support=lineSupport(g,UNITS[u],clues[u]!,clueType);
+    if(!support)throw new Error(`${u<9?'Row':'Column'} ${u%9+1} cannot satisfy its ${clueType === 'sandwich' ? 'sandwich sum' : 'edge difference'} clue.`);
     const eliminations:CellDigit[]=[];
     UNITS[u].forEach((cell,j)=>{if(!g.values[cell])for(const digit of digitsOf(g.cands[cell]&~support[j]))eliminations.push({cell,digit})});
-    if(eliminations.length)return {sandwichUnit: u, primary: UNITS[u].flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:'Sandwich sum',score:5,description:`${u<9?'Row':'Column'} ${u%9+1}: every valid arrangement sums to ${clues[u]} between 1 and 9. Remove candidates absent from all those arrangements.`,placements:[],eliminations};
+    if(eliminations.length)return {sandwichUnit: u, primary: UNITS[u].flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:clueType === 'sandwich' ? 'Sandwich sum' : 'Edge difference',score:5,description:`${u<9?'Row':'Column'} ${u%9+1}: ${clueType === 'sandwich' ? `every valid arrangement sums to ${clues[u]} between 1 and 9` : `every valid arrangement has an absolute difference of ${clues[u]} between the two end cells`}. Remove candidates absent from all those arrangements.`,placements:[],eliminations};
   }return null;
 }
 /** Conservative per-digit bounds on equal multisets, in both directions. */
@@ -154,9 +181,9 @@ export function ringMove(g:Grid):Move|null {
   }return null;
 }
 export const SAFE_ORDER=SOLVE_ORDER.filter(t=>TECHS[t].category!=='Uniqueness' && TECHS[t].score < 300);
-export function nextMove(g:Grid,clues:Clues):Move|null {
+export function nextMove(g:Grid,clues:Clues, clueType: ClueType = 'sandwich'):Move|null {
   if(isBroken(g))throw new Error('The grid has conflicting digits or no valid candidates.');
-  const sandwich=sandwichMove(g,clues);
+  const sandwich=sandwichMove(g,clues,clueType);
   const cheap=findNextStep(g,SAFE_ORDER.filter(t=>TECHS[t].score<200));
   if(cheap)return {...cheap,name:TECHS[cheap.tech].name,score:TECHS[cheap.tech].score};
   if(sandwich)return sandwich;
@@ -168,42 +195,42 @@ export function applyMove(g:Grid,m:Move):void {
   // The imported applyStep only consumes these two fields.
   applyStep(g,{...m,tech:'NAKED_SINGLE'});
 }
-export function validate(g:Grid,clues:Clues):void {
+export function validate(g:Grid,clues:Clues, clueType: ClueType = 'sandwich'):void {
   for(const unit of UNITS){const values=unit.map(c=>g.values[c]).filter(Boolean);if(new Set(values).size!==values.length)throw new Error('Duplicate digits in a row, column, or box.');}
   if(isBroken(g))throw new Error('An empty cell has no possible value.');
-  for(let u=0;u<18;u++)if(clues[u]!==null&&!lineSupport(g,UNITS[u],clues[u]!))throw new Error(`${u<9?'Row':'Column'} ${u%9+1} conflicts with its clue.`);
+  for(let u=0;u<18;u++)if(clues[u]!==null&&!lineSupport(g,UNITS[u],clues[u]!,clueType))throw new Error(`${u<9?'Row':'Column'} ${u%9+1} conflicts with its clue.`);
 }
 /** Exact variant search, capped and explicit about inconclusive searches. */
-export function solveExact(start:Grid, clues:Clues, budget=100000):{solutions:Grid[]; exhausted:boolean} {
+export function solveExact(start:Grid, clues:Clues, budget=100000, clueType: ClueType = 'sandwich'):{solutions:Grid[]; exhausted:boolean} {
   const solutions:Grid[]=[];let nodes=0, exhausted=false;
   function search(input:Grid):void {
     if(solutions.length>=2||exhausted)return;
     if(++nodes>budget){exhausted=true;return}
     const g=cloneGrid(input);
     try {
-      while(true){if(isBroken(g))return;const s=sandwichMove(g,clues);if(s){applyMove(g,s);continue}const single=findNextStep(g,['FULL_HOUSE','NAKED_SINGLE','HIDDEN_SINGLE']);if(single){applyStep(g,single);continue}break}
-      if(isSolved(g)){validate(g,clues);solutions.push(g);return}
+      while(true){if(isBroken(g))return;const s=sandwichMove(g,clues,clueType);if(s){applyMove(g,s);continue}const single=findNextStep(g,['FULL_HOUSE','NAKED_SINGLE','HIDDEN_SINGLE']);if(single){applyStep(g,single);continue}break}
+      if(isSolved(g)){validate(g,clues,clueType);solutions.push(g);return}
     }catch{return}
     let cell=-1,ds:number[]=[];
     for(let i=0;i<81;i++)if(!g.values[i]){const d=digitsOf(g.cands[i]);if(cell<0||d.length<ds.length){cell=i;ds=d}}
     for(const d of ds){const next=cloneGrid(g);setValue(next,cell,d);search(next);if(solutions.length>=2||exhausted)return}
   }
-  validate(start,clues);search(start);return {solutions,exhausted};
+  validate(start,clues,clueType);search(start);return {solutions,exhausted};
 }
 
-export function buildCustomPuzzle(cells: number[], sums: number[]) {
-  if (!sums.length) throw new Error('Highlight at least one sandwich sum.');
+export function buildCustomPuzzle(cells: number[], sums: number[], clueType: ClueType = 'sandwich') {
+  if (!sums.length) throw new Error('Highlight at least one outside clue.');
   for (let attempt = 0; attempt < 100; attempt++) {
     const solution = generate();
-    const allClues = cluesFor(solution.values);
+    const allClues = cluesFor(solution.values, clueType);
     const values = Array.from(solution.values, (digit, cell) => cells.includes(cell) ? digit : 0);
     const clues = allClues.map((clue, index) => sums.includes(index) ? clue : null);
     const grid = gridFromValues(values);
-    const check = solveExact(grid, clues, 250);
+    const check = solveExact(grid, clues, 250, clueType);
     if (!check.exhausted && check.solutions.length === 1) {
-      const rating = rateLogicalPuzzle(grid, clues);
+      const rating = rateLogicalPuzzle(grid, clues, clueType);
       return {grid, clues, rating, solution: rating ? null : solution.values, fullyDug: false};
     }
   }
-  throw new Error('No unique puzzle found using only these highlighted positions. Highlight more cells or sums and try again.');
+  throw new Error('No unique puzzle found using only these highlighted positions. Highlight more cells or clues and try again.');
 }

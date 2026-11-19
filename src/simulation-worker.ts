@@ -1,11 +1,11 @@
 import { gridFromValues } from './vendor/engine/board';
 import { cluesFor, generate, solveExact } from './sandwich';
 
-self.onmessage = ({data: {samples, removed}}) => {
+self.onmessage = ({data: {samples, removed, clueType}}) => {
   for (let sample = 1; sample <= samples; sample++) {
     const start = performance.now();
     const complete = generate();
-    const clues = cluesFor(complete.values);
+    const clues = cluesFor(complete.values, clueType);
     const values = Array.from(complete.values);
     const cells = values.map((_, index) => index);
     for (let i = 0; i < removed; i++) {
@@ -13,7 +13,7 @@ self.onmessage = ({data: {samples, removed}}) => {
       [cells[i], cells[j]] = [cells[j], cells[i]];
       values[cells[i]] = 0;
     }
-    const {solutions, exhausted} = solveExact(gridFromValues(values), clues, 500);
+    const {solutions, exhausted} = solveExact(gridFromValues(values), clues, 500, clueType);
     const result = exhausted ? 'Search limit' : solutions.length === 1 ? 'Unique' : 'Multiple solutions';
     self.postMessage({sample, givens: 81 - removed, result, elapsed: Math.round(performance.now() - start)});
   }

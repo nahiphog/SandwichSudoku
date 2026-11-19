@@ -10,6 +10,22 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 import { cluesFor, generatePuzzle, solveExact } from '../src/sandwich';
 
+it('generates a unique logical edge difference puzzle with paired clue digging', () => {
+  const {grid, clues, rating} = generatePuzzle(true, true, 'pairs', undefined, 'edge-difference');
+  expect(grid.values).toContain(0);
+  expect(rating).not.toBeNull();
+  const result = solveExact(grid, clues, 100000, 'edge-difference');
+  expect(result.exhausted).toBe(false);
+  expect(result.solutions).toHaveLength(1);
+  const all = cluesFor(result.solutions[0].values, 'edge-difference');
+  expect(clues.some(clue => clue !== null)).toBe(true);
+  clues.forEach((clue, i) => { if (clue !== null) expect(clue).toBe(all[i]); });
+  for (let i = 0; i < 9; i++) {
+    expect(clues[i] === null).toBe(clues[8 - i] === null);
+    expect(clues[9 + i] === null).toBe(clues[17 - i] === null);
+  }
+}, 60000);
+
 it('removes digits while retaining all clues and exactly one solution', () => {
   const { grid, clues } = generatePuzzle();
   expect(grid.values).toContain(0);

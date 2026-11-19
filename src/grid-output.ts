@@ -1,7 +1,7 @@
-import {applyMove, RING, CORNERS, type Clues, type Move} from './sandwich';
+import {applyMove, RING, CORNERS, type Clues, type Move, type ClueType} from './sandwich';
 import {bit, cellName, cloneGrid, digitsOf, type Grid} from './vendor/engine/board';
 
-export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues, moves: Move[], solution?: Uint8Array) {
+export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues, moves: Move[], solution?: Uint8Array, clueType: ClueType = 'sandwich') {
   panel.innerHTML = '<h2>Solution walkthrough</h2><p aria-live="polite"></p><small>Teal marks the pattern, amber marks supporting candidates, purple marks fins. Red struck-through candidates are eliminated in this step.</small><div class="walkthrough-grid" aria-label="Walkthrough grid"></div><div class="walkthrough-nav"><button>Previous</button><button>Next</button><button>Show solution</button></div>';
   const description = panel.querySelector('p')!;
   const board = panel.querySelector('.walkthrough-grid')!;
@@ -51,11 +51,11 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
       for (let c = -1; c < 9; c++) {
         const tile = document.createElement('span');
         if (r < 0 || c < 0) {
-          tile.textContent = r < 0 && c < 0 ? '' : String(clues[r < 0 ? 9 + c : r] ?? '');
+          tile.textContent = r < 0 && c < 0 ? (clueType === 'sandwich' ? 'SUM' : 'DIFF') : String(clues[r < 0 ? 9 + c : r] ?? '');
           const unit = r < 0 ? 9 + c : r;
           if (!(r < 0 && c < 0) && move?.sandwichUnit === unit) {
             tile.className = 'walkthrough-driving-clue';
-            tile.setAttribute('aria-label', `${unit < 9 ? 'Row' : 'Column'} ${unit % 9 + 1} sum ${clues[unit]}, driving this deduction`);
+            tile.setAttribute('aria-label', `${unit < 9 ? 'Row' : 'Column'} ${unit % 9 + 1} ${clueType === 'sandwich' ? 'sum' : 'edge difference'} ${clues[unit]}, driving this deduction`);
           }
         } else {
           const cell = r * 9 + c;
@@ -119,8 +119,8 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
   };
 }
 
-export async function copyGridText(grid: Grid, clues: Clues) {
-  const text = JSON.stringify({version: 1, values: Array.from(grid.values), clues});
+export async function copyGridText(grid: Grid, clues: Clues, clueType: ClueType = 'sandwich') {
+  const text = JSON.stringify({version: 1, clueType, values: Array.from(grid.values), clues});
   try {
     await navigator.clipboard.writeText(text);
     return 'Grid string copied with all row and column clue positions.';
@@ -130,7 +130,7 @@ export async function copyGridText(grid: Grid, clues: Clues) {
   }
 }
 
-export async function copyGridImage(grid: Grid, clues: Clues) {
+export async function copyGridImage(grid: Grid, clues: Clues, clueType: ClueType = 'sandwich') {
   const canvas = document.createElement('canvas');
   const size = 64;
   canvas.width = canvas.height = size * 10 + 8;
@@ -139,6 +139,9 @@ export async function copyGridImage(grid: Grid, clues: Clues) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.font = '16px sans-serif';
+  ctx.fillStyle = '#293d39';
+  ctx.fillText(clueType === 'sandwich' ? 'SUM' : 'DIFF', size / 2, size / 2);
   ctx.font = '32px sans-serif';
   ctx.fillStyle = '#293d39';
   const label = (value: number | null, row: number, col: number) => {
@@ -167,14 +170,14 @@ export async function copyGridImage(grid: Grid, clues: Clues) {
   });
   try {
     await navigator.clipboard.write([new ClipboardItem({'image/png': png})]);
-    return 'Grid image copied with row and column sums.';
+    return 'Grid image copied with row and column clues.';
   } catch {
     const blob = await png.catch(() => null);
     if (!blob) return 'The grid image could not be created.';
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'sandwich-sudoku.png';
+    link.download = `${clueType}-sudoku.png`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     return 'Grid image downloaded as PNG.';

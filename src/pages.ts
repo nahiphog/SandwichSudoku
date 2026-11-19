@@ -1,19 +1,19 @@
 import {TECHS} from './vendor/engine/ratings';
-const pages = [
-  ['generate', 'Generate'],
-  ['import-grid', 'Import grid'],
-  ['simulation', 'Simulation'],
-  ['about', 'About'],
-  ['techniques', 'Techniques'],
-  ['custom-build', 'Custom build'],
-] as const;
+import {pages, pagePath, resolvePage} from './routes';
+
+// Both source modules and built assets live one directory below the app root.
+export const appBase = new URL(/* @vite-ignore */ '../', import.meta.url).pathname;
 
 export function mountPages() {
   const menu = document.createElement('details');
   menu.className = 'page-menu';
   menu.innerHTML = '<summary>Generate</summary><nav aria-label="Studio pages">' +
-    pages.map(([id, label]) => `<a href="?page=${id}">${label}</a>`).join('') + '</nav>';
-  document.querySelector('header')!.append(menu);
+    pages.filter(([id]) => id !== 'about').map(([id, label]) => `<a href="${pagePath(id, appBase)}">${label}</a>`).join('') + '</nav>';
+  const aboutLink = document.createElement('a');
+  aboutLink.className = 'header-about';
+  aboutLink.href = pagePath('about', appBase);
+  aboutLink.textContent = 'About';
+  document.querySelector('header')!.append(menu, aboutLink);
   const main = document.querySelector('main')!;
   const [intro, workspace, lower] = Array.from(main.children) as HTMLElement[];
   const [history, transfer] = Array.from(lower.children) as HTMLDetailsElement[];
@@ -28,6 +28,7 @@ export function mountPages() {
         !tech.enabled ? 'Disabled' : 'Enabled',
     })),
     {name: 'Sandwich sum', score: 5, status: 'Enabled'},
+    {name: 'Edge difference', score: 5, status: 'Enabled'},
     {name: 'Phistomefel Ring', score: 200, status: 'Enabled'},
   ].sort((a, b) => a.score - b.score || a.name.localeCompare(b.name));
   for (const entry of entries) {
@@ -44,7 +45,7 @@ export function mountPages() {
   simulation.className = 'card simulation';
   simulation.innerHTML = `<h1>Simulation</h1>
     <p>Generate sample grids, remove random digits, and check whether each puzzle has a unique solution.</p>
-    <form><label>Samples <input name="samples" type="number" min="1" max="100" value="10" required></label>
+    <form><label>Clue type <select name="clueType"><option value="sandwich">Sandwich sum</option><option value="edge-difference">Edge difference</option></select></label><label>Samples <input name="samples" type="number" min="1" max="100" value="10" required></label>
     <label>Digits to remove <input name="removed" type="number" min="0" max="81" value="35" required></label>
     <button class="primary">Run simulation</button><button type="button" hidden>Cancel</button></form>
     <p role="status"></p><button id="simulation-export" hidden>Download results CSV</button>
@@ -90,7 +91,7 @@ export function mountPages() {
       else output.textContent = `Running ${sample} of ${samples} samples…`;
     };
     runner.onerror = () => stop('Simulation stopped after a calculation error.');
-    runner.postMessage({samples, removed});
+    runner.postMessage({samples, removed, clueType: data.get('clueType')});
   };
   cancel.onclick = () => stop('Simulation cancelled. Completed samples are available below.');
   exportButton.onclick = () => {
@@ -107,22 +108,27 @@ export function mountPages() {
   const generate = intro.querySelector<HTMLElement>('.generation-actions')!;
   const nav = menu.querySelector('nav')!;
   function route() {
-    const requested = new URLSearchParams(location.search).get('page');
-    const [page, label] = pages.find(([id]) => id === requested) ?? pages[0];
+    const url = new URL(location.href);
+    const [page, label] = resolvePage(url, appBase);
+    if (url.searchParams.has('page')) {
+      url.searchParams.delete('page');
+      url.pathname = pagePath(page, appBase);
+      window.history.replaceState(null, '', url);
+    }
     const hasBoard = ['generate', 'import-grid', 'custom-build'].includes(page);
     document.body.dataset.page = page;
-    menu.querySelector('summary')!.textContent = label;
+    menu.querySelector('summary')!.textContent = page === 'about' ? 'Pages' : label;
     menu.open = false;
-    nav.querySelectorAll('a').forEach(link => {
-      if (link.search === `?page=${page}`) link.setAttribute('aria-current', 'page');
+    [...Array.from(nav.querySelectorAll('a')), aboutLink].forEach(link => {
+      if (link.pathname === pagePath(page, appBase)) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
     });
     intro.hidden = page === 'simulation';
     heading.textContent = label;
     description.textContent = ({
       generate: '',
-      'import-grid': 'Load a Sandwich Sudoku puzzle and check its solution.',
-      'custom-build': 'Click cells and outside sum positions to highlight where givens may appear. Build fills only highlighted positions and verifies exactly one solution.',
+      'import-grid': 'Load a Sudoku puzzle and check its solution.',
+      'custom-build': 'Click cells and outside clue positions to highlight where givens may appear. Build fills only highlighted positions and verifies exactly one solution.',
       simulation: '',
       about: '',
       techniques: 'Techniques and difficulty ratings.',
@@ -157,6 +163,12 @@ export function mountPages() {
     window.history.pushState(null, '', link.href);
     route();
     menu.querySelector('summary')!.focus();
+  });
+  aboutLink.addEventListener('click', event => {
+    if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    window.history.pushState(null, '', aboutLink.href);
+    route();
   });
   document.addEventListener('click', event => {
     if (!menu.contains(event.target as Node)) menu.open = false;
