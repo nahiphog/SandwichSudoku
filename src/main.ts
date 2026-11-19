@@ -124,6 +124,7 @@ el('generate-puzzle').onclick = () => {
         instances.forEach(({step}, index) => {
           const link = document.createElement('button');
           link.className = 'technique-step-link';
+          link.dataset.walkthroughStep = String(step);
           link.textContent = String(index + 1);
           link.setAttribute('aria-label', `${name}, instance ${index + 1}, step ${step}`);
           link.title = `Jump to step ${step}`;
@@ -173,4 +174,11 @@ render();
 
 el('copy-string').onclick = async () => status(await copyGridText(grid, clues));
 el('copy-image').onclick = async () => status(await copyGridImage(grid, clues));
+el('walkthrough').addEventListener('walkthroughstepchange', event => {
+  const step = (event as CustomEvent<{step: number}>).detail.step;
+  el('generation-rating').querySelectorAll<HTMLButtonElement>('[data-walkthrough-step]').forEach(link => {
+    if (Number(link.dataset.walkthroughStep) === step) link.setAttribute('aria-current', 'step');
+    else link.removeAttribute('aria-current');
+  });
+});
 mountPages();

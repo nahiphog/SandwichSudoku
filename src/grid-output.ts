@@ -101,6 +101,7 @@ export function mountWalkthrough(panel: HTMLElement, puzzle: Grid, clues: Clues,
     }
     previous.disabled = step === 0;
     next.disabled = finish.disabled = step === end;
+    panel.dispatchEvent(new CustomEvent('walkthroughstepchange', {detail: {step}}));
   }
   previous.onclick = () => { step--; render(); };
   next.onclick = () => { step++; render(); };
