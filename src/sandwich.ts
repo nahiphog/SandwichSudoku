@@ -134,7 +134,7 @@ export function sandwichMove(g:Grid,clues:Clues):Move|null {
     if(!support)throw new Error(`${u<9?'Row':'Column'} ${u%9+1} cannot satisfy its sandwich clue.`);
     const eliminations:CellDigit[]=[];
     UNITS[u].forEach((cell,j)=>{if(!g.values[cell])for(const digit of digitsOf(g.cands[cell]&~support[j]))eliminations.push({cell,digit})});
-    if(eliminations.length)return {sandwichUnit: u, primary: UNITS[u].flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:'Sandwich sum',score:0,description:`${u<9?'Row':'Column'} ${u%9+1}: every valid arrangement sums to ${clues[u]} between 1 and 9. Remove candidates absent from all those arrangements.`,placements:[],eliminations};
+    if(eliminations.length)return {sandwichUnit: u, primary: UNITS[u].flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:'Sandwich sum',score:5,description:`${u<9?'Row':'Column'} ${u%9+1}: every valid arrangement sums to ${clues[u]} between 1 and 9. Remove candidates absent from all those arrangements.`,placements:[],eliminations};
   }return null;
 }
 /** Conservative per-digit bounds on equal multisets, in both directions. */
@@ -153,7 +153,7 @@ export function ringMove(g:Grid):Move|null {
     if(placements.length||eliminations.length)return {primary: RING.flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))), secondary: CORNERS.flatMap(cell => (g.values[cell] ? [g.values[cell]] : digitsOf(g.cands[cell])).map(digit => ({cell, digit}))),name:'Phistomefel Ring',score:200,description:`The ring and corners contain the same number of ${digit}s. Their shared count is between ${lo} and ${hi}; a saturated count removes candidates, and a required count forces the remaining positions.`,placements,eliminations};
   }return null;
 }
-export const SAFE_ORDER=SOLVE_ORDER.filter(t=>TECHS[t].category!=='Uniqueness');
+export const SAFE_ORDER=SOLVE_ORDER.filter(t=>TECHS[t].category!=='Uniqueness' && TECHS[t].score < 300);
 export function nextMove(g:Grid,clues:Clues):Move|null {
   if(isBroken(g))throw new Error('The grid has conflicting digits or no valid candidates.');
   const sandwich=sandwichMove(g,clues);

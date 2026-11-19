@@ -1,8 +1,10 @@
+import {TECHS} from './vendor/engine/ratings';
 const pages = [
   ['generate', 'Generate'],
   ['import-grid', 'Import grid'],
   ['simulation', 'Simulation'],
   ['about', 'About'],
+  ['techniques', 'Techniques'],
   ['custom-build', 'Custom build'],
 ] as const;
 
@@ -15,6 +17,29 @@ export function mountPages() {
   const main = document.querySelector('main')!;
   const [intro, workspace, lower] = Array.from(main.children) as HTMLElement[];
   const [history, transfer] = Array.from(lower.children) as HTMLDetailsElement[];
+  const techniques = document.createElement('section');
+  techniques.className = 'card';
+  techniques.innerHTML = '<h2>Techniques</h2><div class="tech-list"></div>';
+  const entries = [
+    ...Object.values(TECHS).map(tech => ({
+      name: tech.name, score: tech.score,
+      status: !tech.implemented ? 'Unavailable' : tech.name === 'Brute Force' ? 'Optional' :
+        tech.score >= 300 ? 'Disabled' : tech.category === 'Uniqueness' ? 'Classic only' :
+        !tech.enabled ? 'Disabled' : 'Enabled',
+    })),
+    {name: 'Sandwich sum', score: 5, status: 'Enabled'},
+    {name: 'Phistomefel Ring', score: 200, status: 'Enabled'},
+  ].sort((a, b) => a.score - b.score || a.name.localeCompare(b.name));
+  for (const entry of entries) {
+    const row = document.createElement('div');
+    const name = document.createElement('strong');
+    name.textContent = entry.name;
+    const detail = document.createElement('span');
+    detail.textContent = '+' + entry.score + ' · ' + entry.status;
+    row.append(name, detail);
+    techniques.querySelector('.tech-list')!.append(row);
+  }
+  main.append(techniques);
   const simulation = document.createElement('section');
   simulation.className = 'card simulation';
   simulation.innerHTML = `<h1>Simulation</h1>
@@ -100,6 +125,7 @@ export function mountPages() {
       'custom-build': 'Click cells and outside sum positions to highlight where givens may appear. Build fills only highlighted positions and verifies exactly one solution.',
       simulation: '',
       about: '',
+      techniques: 'Techniques and difficulty ratings.',
     })[page];
     description.hidden = page === 'generate';
     generate.hidden = page !== 'generate' && page !== 'custom-build';
@@ -108,7 +134,7 @@ export function mountPages() {
     document.getElementById('custom-generate')!.hidden = page !== 'custom-build';
     document.getElementById('custom-clear')!.hidden = page !== 'custom-build';
     workspace.hidden = !hasBoard;
-    lower.hidden = page === 'simulation' || page === 'about';
+    lower.hidden = page === 'simulation' || page === 'about' || page === 'techniques';
     history.hidden = !hasBoard;
     transfer.hidden = !hasBoard;
     if (page === 'import-grid') {
@@ -119,6 +145,7 @@ export function mountPages() {
       main.insertBefore(workspace, lower);
     }
     simulation.hidden = page !== 'simulation';
+    techniques.hidden = page !== 'techniques';
     about.hidden = page !== 'about';
     window.dispatchEvent(new Event("pagechange"));
     document.title = `${label} · Sandwich Sudoku Studio`;
