@@ -106,34 +106,32 @@ el('generate-puzzle').onclick = () => {
     title.textContent = rating ? `Total difficulty score: ${rating.score}` : 'Logical solve stalled';
     report.append(title);
     if (rating) {
-      const list = document.createElement('ul');
-      for (const [name, count] of rating.techniques) {
-        const item = document.createElement('li');
+      const table = document.createElement('table');
+      table.className = 'difficulty-techniques';
+      table.innerHTML = '<thead><tr><th scope="col">Technique</th><th scope="col">Steps</th></tr></thead>';
+      const body = table.createTBody();
+      for (const [name] of rating.techniques) {
+        const row = body.insertRow();
+        const technique = document.createElement('th');
+        technique.scope = 'row';
+        technique.textContent = name;
+        row.append(technique);
+        const steps = row.insertCell();
         const instances = rating.moves
           .map((move, index) => ({name: move.name, step: index + 1, score: move.score}))
           .filter(move => move.name === name);
-        const technique = document.createElement('button');
-        technique.className = 'technique-step-link';
-        technique.textContent = name;
-        technique.onclick = () => walkthrough.goToStep(instances[0].step);
-        item.append(technique);
-        const breakdown = document.createElement('span');
-        const subtotal = instances.reduce((sum, instance) => sum + instance.score, 0);
-        breakdown.textContent = ` — +${instances[0].score} × ${count} ${count === 1 ? 'instance' : 'instances'} = ${subtotal} points. Steps `;
-        item.append(breakdown);
         instances.forEach(({step}, index) => {
           const link = document.createElement('button');
           link.className = 'technique-step-link';
           link.dataset.walkthroughStep = String(step);
-          link.textContent = String(index + 1);
+          link.textContent = String(step);
           link.setAttribute('aria-label', `${name}, instance ${index + 1}, step ${step}`);
           link.title = `Jump to step ${step}`;
           link.onclick = () => walkthrough.goToStep(step);
-          item.append(' ', link);
+          steps.append(' ', link);
         });
-        list.append(item);
       }
-      report.append(list);
+      report.append(table);
     }
     status(data.result.fullyDug
       ? 'Fully dug with exactly one solution. Every remaining removal allowed by your settings would break uniqueness.'
