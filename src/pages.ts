@@ -7,7 +7,7 @@ export const appBase = new URL(/* @vite-ignore */ '../', import.meta.url).pathna
 export function mountPages() {
   const menu = document.createElement('details');
   menu.className = 'page-menu';
-  menu.innerHTML = '<summary>Generate</summary><nav aria-label="Studio pages">' +
+  menu.innerHTML = '<summary>Pages</summary><nav aria-label="Pages">' +
     pages.filter(([id]) => id !== 'about').map(([id, label]) => `<a href="${pagePath(id, appBase)}">${label}</a>`).join('') + '</nav>';
   const aboutLink = document.createElement('a');
   aboutLink.className = 'header-about';
@@ -45,7 +45,7 @@ export function mountPages() {
   simulation.className = 'card simulation';
   simulation.innerHTML = `<h1>Simulation</h1>
     <p>Generate sample grids, remove random digits, and check whether each puzzle has a unique solution.</p>
-    <form><label>Clue type <select name="clueType"><option value="sandwich">Sandwich sum</option><option value="edge-difference">Edge difference</option></select></label><label>Samples <input name="samples" type="number" min="1" max="100" value="10" required></label>
+    <form><fieldset class="clue-switch"><legend>Choose your puzzle type</legend><div class="clue-options"><label><input type="radio" name="clueType" value="sandwich" checked><span>Sandwich sums</span></label><label><input type="radio" name="clueType" value="edge-difference"><span>Edge difference</span></label></div></fieldset><label>Samples <input name="samples" type="number" min="1" max="100" value="10" required></label>
     <label>Digits to remove <input name="removed" type="number" min="0" max="81" value="35" required></label>
     <button class="primary">Run simulation</button><button type="button" hidden>Cancel</button></form>
     <p role="status"></p><button id="simulation-export" hidden>Download results CSV</button>
@@ -117,7 +117,7 @@ export function mountPages() {
     }
     const hasBoard = ['generate', 'import-grid', 'custom-build'].includes(page);
     document.body.dataset.page = page;
-    menu.querySelector('summary')!.textContent = page === 'about' ? 'Pages' : label;
+    menu.querySelector('summary')!.textContent = 'Pages';
     menu.open = false;
     [...Array.from(nav.querySelectorAll('a')), aboutLink].forEach(link => {
       if (link.pathname === pagePath(page, appBase)) link.setAttribute('aria-current', 'page');
@@ -154,7 +154,7 @@ export function mountPages() {
     techniques.hidden = page !== 'techniques';
     about.hidden = page !== 'about';
     window.dispatchEvent(new Event("pagechange"));
-    document.title = `${label} · Sandwich Sudoku Studio`;
+    document.title = `${label} · Sandwich Sudoku`;
   }
   nav.addEventListener('click', event => {
     const link = (event.target as HTMLElement).closest('a');

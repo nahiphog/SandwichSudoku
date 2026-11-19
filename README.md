@@ -20,7 +20,7 @@ Click a cell and type, use the keypad, or edit any outside clue. Blank clues are
 absent constraints; zero clues require adjacent 1 and 9. Clear digits retains
 the clues; Blank grid clears both. JSON import/export saves constructions.
 
-Choose **Edge difference** in the Clue type selector below the grid to use
+Choose **Edge difference** in the puzzle type toggle above the grid to use
 absolute endpoint differences instead of sandwich sums. Left clues compare
 the first and last cells of each row; top clues compare the top and bottom
 cells of each column. For example, endpoints 2 and 9 give 7 in either order.
