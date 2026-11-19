@@ -33,3 +33,11 @@ it('keeps at least one sandwich clue and preserves uniqueness when digging sums'
   expect(result.exhausted).toBe(false);
   expect(result.solutions).toHaveLength(1);
 }, 60000);
+
+it('removes outside clues in matching row and column pairs', () => {
+  const {clues} = generatePuzzle(false, true, 'pairs');
+  for (let index = 0; index < 9; index++) {
+    expect(clues[index] === null).toBe(clues[8 - index] === null);
+    expect(clues[9 + index] === null).toBe(clues[17 - index] === null);
+  }
+}, 60000);

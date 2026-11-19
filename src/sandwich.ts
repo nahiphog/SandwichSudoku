@@ -25,8 +25,9 @@ export function generate(): Grid {
   return fill(gridFromValues(new Array(81).fill(0)))!;
 }
 /** Keep each removal only when exact search proves the remaining puzzle unique. */
+export type SumDigMode = "none" | "single" | "pairs";
 type DigProgress = (values: number[], clues: Clues, phase: "start" | "digits" | "clues" | "rating") => void;
-function digPuzzle(rotational: boolean, digClues: boolean, progress?: DigProgress) {
+function digPuzzle(rotational: boolean, digClues: boolean | SumDigMode, progress?: DigProgress) {
   const solution = generate();
   const clues = cluesFor(solution.values);
   const values = Array.from(solution.values);
@@ -46,19 +47,22 @@ function digPuzzle(rotational: boolean, digClues: boolean, progress?: DigProgres
     }
   }
   const grid = gridFromValues(values);
-  if (digClues) {
+  if (digClues && digClues !== 'none') {
     let remaining = clues.length;
-    for (const index of shuffle(Array.from(clues.keys()))) {
-      if (remaining === 1) break;
-      const clue = clues[index];
-      clues[index] = null;
+    const groups = digClues === 'pairs'
+      ? [0, 1, 2, 3, 9, 10, 11, 12].map(index =>
+          [index, index < 9 ? 8 - index : 26 - index])
+      : Array.from(clues.keys(), index => [index]);
+    for (const group of shuffle(groups)) {
+      if (remaining - group.length < 1) continue;
+      const originals = group.map(index => clues[index]);
+      for (const index of group) clues[index] = null;
       const check = solveExact(grid, clues, 250);
       if (check.exhausted) fullyDug = false;
       if (!check.exhausted && check.solutions.length === 1) {
-        remaining--;
+        remaining -= group.length;
         progress?.(values, clues, "clues");
-      }
-      else clues[index] = clue;
+      } else group.forEach((index, offset) => { clues[index] = originals[offset]; });
     }
   }
   return {grid, clues, fullyDug, solution: solution.values};
@@ -78,10 +82,13 @@ export function rateLogicalPuzzle(input: Grid, clues: Clues) {
     score += move.score;
   }
   validate(grid, clues);
-  return {score, techniques: [...techniques], moves};
+  const weights = new Map(moves.map(move => [move.name, move.score]));
+  const sortedTechniques = [...techniques].sort(([a], [b]) =>
+    weights.get(a)! - weights.get(b)! || a.localeCompare(b));
+  return {score, techniques: sortedTechniques, moves};
 }
 
-export function generatePuzzle(logicalOnly = false, rotational = true, digClues = false, progress?: DigProgress) {
+export function generatePuzzle(logicalOnly = false, rotational = true, digClues: boolean | SumDigMode = false, progress?: DigProgress) {
   for (let attempt = 0; attempt < 10; attempt++) {
     const puzzle = digPuzzle(rotational, digClues, progress);
     progress?.(Array.from(puzzle.grid.values), puzzle.clues, "rating");
@@ -171,4 +178,21 @@ export function solveExact(start:Grid, clues:Clues, budget=100000):{solutions:Gr
     for(const d of ds){const next=cloneGrid(g);setValue(next,cell,d);search(next);if(solutions.length>=2||exhausted)return}
   }
   validate(start,clues);search(start);return {solutions,exhausted};
+}
+
+export function buildCustomPuzzle(cells: number[], sums: number[]) {
+  if (!sums.length) throw new Error('Highlight at least one sandwich sum.');
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const solution = generate();
+    const allClues = cluesFor(solution.values);
+    const values = Array.from(solution.values, (digit, cell) => cells.includes(cell) ? digit : 0);
+    const clues = allClues.map((clue, index) => sums.includes(index) ? clue : null);
+    const grid = gridFromValues(values);
+    const check = solveExact(grid, clues, 250);
+    if (!check.exhausted && check.solutions.length === 1) {
+      const rating = rateLogicalPuzzle(grid, clues);
+      return {grid, clues, rating, solution: rating ? null : solution.values, fullyDug: false};
+    }
+  }
+  throw new Error('No unique puzzle found using only these highlighted positions. Highlight more cells or sums and try again.');
 }

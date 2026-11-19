@@ -99,12 +99,16 @@ export function mountPages() {
       generate: '',
       'import-grid': 'Load a Sandwich Sudoku puzzle and check its solution.',
       techniques: 'Explore the solver’s techniques and their difficulty scores.',
-      'custom-build': 'Edit digits and outside clues, then check your puzzle for uniqueness.',
+      'custom-build': 'Click cells and outside sum positions to highlight where givens may appear. Build fills only highlighted positions and verifies exactly one solution.',
       simulation: '',
       about: '',
     })[page];
     description.hidden = page === 'generate';
-    generate.hidden = page !== 'generate';
+    generate.hidden = page !== 'generate' && page !== 'custom-build';
+    document.querySelectorAll<HTMLElement>('.generation-actions > label').forEach(label => label.hidden = page === 'custom-build');
+    document.getElementById('generate-puzzle')!.hidden = page === 'custom-build';
+    document.getElementById('custom-generate')!.hidden = page !== 'custom-build';
+    document.getElementById('custom-clear')!.hidden = page !== 'custom-build';
     workspace.hidden = !hasBoard;
     lower.hidden = page === 'simulation' || page === 'about';
     history.hidden = !hasBoard;
@@ -120,6 +124,7 @@ export function mountPages() {
     }
     simulation.hidden = page !== 'simulation';
     about.hidden = page !== 'about';
+    window.dispatchEvent(new Event("pagechange"));
     document.title = `${label} · Sandwich Sudoku Studio`;
   }
   nav.addEventListener('click', event => {
