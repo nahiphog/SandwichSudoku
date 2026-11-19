@@ -17,13 +17,20 @@ header{position:relative;justify-content:flex-start}header .brand{position:absol
 .technique-score-breakdown{display:block;margin-top:5px;font-size:11px;color:#6b766d;line-height:1.5}
 .header-about{margin-left:auto;padding:10px 14px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600}.header-about:hover,.header-about[aria-current=page]{background:#e0ece1}.header-about:focus-visible{outline:3px solid #d58b3c;outline-offset:2px}@media(max-width:520px){.header-about{padding:7px;font-size:11px}}
 .difficulty-techniques .active-technique-row{background:#e1ecfb}.difficulty-techniques .active-technique-row>th{box-shadow:inset 3px 0 #1759ba}
-.clue-switch{min-width:0;margin:0 0 22px;padding:14px;border:2px solid #71947c;border-radius:12px;background:#edf3e9}
-.clue-switch legend{padding:0 7px;font-weight:800;font-size:15px;color:#304b43}
-.clue-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.clue-options label{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:12px 10px;border:2px solid #b7c9b9;border-radius:8px;background:#fffefa;color:#304b43;font-size:15px;font-weight:700;cursor:pointer}
-.clue-options label:has(input:checked){background:#315d49;border-color:#315d49;color:white}
-.clue-options label:has(input:focus-visible){outline:3px solid #d58b3c;outline-offset:3px}
-.clue-options input{width:17px;height:17px;margin:0;flex-shrink:0;accent-color:#315d49}
-.clue-switch p{margin:12px 0 0;font-size:13px;line-height:1.5;color:#405c4b}
+.clue-switch{min-width:0;margin:0 0 16px;padding:0;border:0;background:transparent}
+.clue-switch legend{padding:0;margin-bottom:7px;font-weight:600;font-size:12px;color:#6b766d}
+.clue-options{display:inline-flex;gap:2px;padding:3px;border:1px solid #d9e0d8;border-radius:8px;background:#edf0e8}
+.clue-options label{position:relative;display:flex;align-items:center;justify-content:center;gap:6px;padding:7px 11px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer}
+.clue-options label:has(input:checked){background:#fffefa;color:#315d49;box-shadow:0 1px 3px #293d3915}
+.clue-options label:has(input:focus-visible){outline:3px solid #d58b3c;outline-offset:2px}
+.clue-options input{position:absolute;width:1px;height:1px;opacity:0}
+.clue-switch p{margin:7px 0 0;font-size:12px;line-height:1.5;color:#6b766d}
 .simulation form>.clue-switch{flex-basis:100%;width:100%}
-@media(max-width:420px){.clue-options{gap:6px}.clue-options label{font-size:13px;padding:10px 6px}.clue-switch{padding:10px}}
+body[data-page=generate] .intro{margin-bottom:20px}
+.generation-actions{width:100%;justify-content:flex-start;align-items:center;gap:12px 20px}
+.generation-actions>.clue-switch{flex-basis:100%;margin:0;order:0}
+.generation-actions>button{order:1}
+.generation-actions>label{flex-basis:auto;justify-content:flex-start;order:2;font-size:12px}
+.generation-actions select{font-size:12px;max-width:230px;background:#fffefa;color:inherit}
+.rules h2:not(:first-child){margin-top:30px}
+@media(max-width:760px){.generation-actions{gap:12px}.generation-actions>label:last-of-type{flex-basis:100%}.generation-actions select{min-width:0;max-width:100%}}

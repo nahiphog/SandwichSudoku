@@ -106,6 +106,8 @@ export function mountPages() {
   const heading = intro.querySelector('h1')!;
   const description = intro.querySelector('p')!;
   const generate = intro.querySelector<HTMLElement>('.generation-actions')!;
+  const clueType = document.getElementById('clue-type')!;
+  const boardPanel = workspace.querySelector('.board-panel')!;
   const nav = menu.querySelector('nav')!;
   function route() {
     const url = new URL(location.href);
@@ -125,6 +127,9 @@ export function mountPages() {
     });
     intro.hidden = page === 'simulation';
     heading.textContent = label;
+    heading.parentElement!.hidden = page === 'generate';
+    if (page === 'generate' || page === 'custom-build') generate.prepend(clueType);
+    else boardPanel.prepend(clueType);
     description.textContent = ({
       generate: '',
       'import-grid': 'Load a Sudoku puzzle and check its solution.',
